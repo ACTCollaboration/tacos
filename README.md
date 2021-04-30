@@ -1,8 +1,6 @@
 # CompSep
 
-Bayesian map-based component seperation for ACT
-
-#### Features
+Bayesian map-based component separation for ACT
 
 ### Dependencies
 
