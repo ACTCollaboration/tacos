@@ -1,4 +1,4 @@
-# CompSep
+# The ACT COmponent Separator (TACOS)
 
 Bayesian map-based component separation for ACT
 
