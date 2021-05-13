@@ -9,6 +9,7 @@ Bayesian map-based component separation for ACT
 - [pixell](https://pypi.org/project/pixell/)
 - [enlib](https://github.com/amaurea/enlib)
 - [optweight](https://github.com/AdriJD/optweight)
+- [yaml](https://pyyaml.org/wiki/PyYAMLDocumentation)
 
 
 ### Installation
