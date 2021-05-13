@@ -1,4 +1,5 @@
 import numpy as np
+import os 
 
 from pixell import enmap
 
@@ -61,16 +62,36 @@ class BandPass():
         Returns
         -------
         hfi_bandpass : bandpass.BandPass instance
+            Bandpass instance for requested HFI band.
+
+        Raises
+        ------
+        ValueError
+            If band is not recognized.        
         '''
 
-        with h5py.File(filename + '.hdf5', 'r') as f:
-            factors = f['factors'][()]
-            rule = f['rule'][()]
-            weights = f['weights'][()]
-            ells = f['ells_full'][()]
-            name = f['name'][()].decode("utf-8") 
+        bands = ['100', '143', '217', '353', '545', '857']
+        if band not in bands:
+            raise ValueError(f'Requested band : {band} not recognized. '
+                             f'Pick from {bands}.')
+        
+        if not os.path.splitext(filename)[1]:
+            filename = filename + '.hdf5'
 
-        return cls(factors, rule, weights, ells, name)
+        with h5py.File(filename, 'r') as hfile:
+            
+            if psb_only and band == '353':
+                bandname = band + '_psb'
+            else:
+                bandanme = band
+
+            bandpass = hfile[f'{bandname}/bandpass'][()]
+            nu = hfile[f'{bandname}/nu'][()]
+
+            if nu_sq_corr:
+                bandpass *= nu ** 2
+
+        return cls(bandpass, nu)
 
 def get_mixing_matrix(bandpasses, betas, dtype=np.float32):
     '''
