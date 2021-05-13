@@ -3,7 +3,7 @@ Functions for unit conversions.
 '''
 import numpy as np
 
-from compsep import constants as cs
+from tacos import constants as cs
     
 def convert_rj_to_cmb(bandpass, nu):
     '''

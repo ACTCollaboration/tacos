@@ -1,7 +1,7 @@
 import unittest
 import numpy as np
 
-from compsep import units
+from tacos import units
 
 class TestUnits(unittest.TestCase):
 
