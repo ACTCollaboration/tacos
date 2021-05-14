@@ -23,8 +23,8 @@ with fits.open(args.filepath) as hdul:
 
     for bidx, band in enumerate(bands):
 
-        # Skip first two HDUs.
-        data = Table(hdul[bidx+2].data)
+        # Skip first three HDUs.
+        data = Table(hdul[bidx+3].data)
 
         # Go from [cm]^-1 to Hz.
         nu = data['WAVENUMBER'] * 1e2 * constants.clight()

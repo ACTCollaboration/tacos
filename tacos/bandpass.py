@@ -2,8 +2,9 @@ import numpy as np
 import os 
 
 from pixell import enmap
+import h5py
 
-from compsep import units
+from tacos import units
 
 class BandPass():
     '''
@@ -21,13 +22,8 @@ class BandPass():
         
         self.bandpass = bandpass / np.trapz(bandpass, x=nu)
         self.nu = nu
-
-        # Can compute conv factor at init, right?
-        # Can also compute interpolation table at init.
-
-    def conv_fact_rj_to_cmb(self):
-
-        return units.convert_rj_to_cmb(self.bandpass, self.nu)
+        self.c_fact_rj_to_cmb = units.convert_rj_to_cmb(
+            self.bandpass, self.nu)
 
     def compute_interpolation(self):
         
@@ -175,7 +171,7 @@ class BandPass():
                 nda = 4
 
             # Use average of bandpasses for now.
-            for didx, da in enumerate(range(1 + nda)):
+            for didx, da in enumerate(range(1, 1 + nda)):
                 for rad in range(1, 3):
                     
                     bandname = band + str(da) + str(rad)
@@ -213,7 +209,7 @@ def get_mixing_matrix(bandpasses, betas, dtype=np.float32):
     ncomp = betas.shape[0]
 
     if isinstance(betas, enmap.ndmap):
-        mixing_mat = enmap.zeros((nj,) + betas.shape), wcs=betas.wcs)
+        mixing_mat = enmap.zeros((nj,) + betas.shape, wcs=betas.wcs)
     else:
         mixing_mat = np.zeros((nj, ncomp), dtype=dtype)
 

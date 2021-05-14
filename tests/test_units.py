@@ -56,8 +56,12 @@ class TestUnits(unittest.TestCase):
         nu = np.linspace(1e9, 410e9, num=10000)
         bandpass = np.ones_like(nu)
 
+        ##
+        #bandpass *= nu ** 2
+        #ba
+
         u_fact = units.convert_rj_to_cmb(bandpass, nu)
-        u_fact_exp = 5.6272697337624376 # From Mathematica.
+        u_fact_exp = 2.2348415733572202 # From Mathematica.
 
         self.assertAlmostEqual(u_fact, u_fact_exp, places=6)
 

@@ -44,11 +44,11 @@ for bidx, band in enumerate(bands):
             # Coadd the two channels, Eq. 45 in Jarosik 2003 astro-ph/0301164.
             chn1 = out[1]
             chn2 = out[2]
-            w_prime = units.db_dt(nu) * cs.clight() ** 2 / 2 / cs.kboltz()
-            coadd = np.divide(chn1, w_prime * chn1, where=chn1!=0)
-            coadd += np.divide(chn2, w_prime * chn2, where=chn2!=0)
-            coadd *= 0.5
-            
+
+            w_prime = units.dw_dt(nu)
+            coadd = 0.5 * (chn1 / np.sum(chn1 * w_prime))
+            coadd += 0.5 * (chn2 / np.sum(chn2 * w_prime))
+
             key = band + str(da) + str(rad)
             bandpasses[key] = {}
             bandpasses[key]['nu'] = nu

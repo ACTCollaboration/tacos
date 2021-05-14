@@ -28,9 +28,11 @@ def convert_rj_to_cmb(bandpass, nu):
     bandpass = np.atleast_1d(bandpass)
 
     # Note, typo in beyondplanck 2011.05609: eq. 39 uses h instead of kb.
-    numerator = np.trapz(2 * cs.kboltz() * (nu  / cs.clight()) ** 2 * bandpass,
-                         x=nu)
-    denominator = np.trapz(db_dt(nu) * bandpass, x=nu)
+    # We use Eq. 46 in Jarosik 2003 astro-ph/0301164.
+
+    numerator = np.trapz(bandpass, x=nu)
+    w_prime = dw_dt(nu)
+    denominator = np.trapz(w_prime * bandpass, x=nu)
 
     return numerator / denominator
 
@@ -61,10 +63,14 @@ def integrate_over_bandpass(signal, bandpass, nu, axis=-1):
 
     return np.trapz(signal * bandpass, x=nu, axis=axis)
 
-def db_dt(nu, temp=None):
+def dw_dt(nu, temp=None):
     '''
-    Return derivative of blackbody function with respect to temperature,
-    evaluated at a given temperature.
+    Return derivative of w function (defined in Eq. 38 in Jarosik 2003 
+    astro-ph/0301164) with respect to a given temperature. 
+
+    w = h nu  / (e^x - 1),    x = h nu / kB / T.
+    
+    dw / dT = x^2 e^x / (e^x - 1)^2.
 
     Arguments
     ---------
@@ -76,9 +82,9 @@ def db_dt(nu, temp=None):
 
     Returns
     -------
-    db_dt : (nfreq) array or float
-        Derivative of blackbody function with respect to temperature,                                              
-        evaluated at input temperature. In units of W / (sr m^2 Hz K).
+    dw_dt : (nfreq) array or float
+        Derivative of w respect to temperature, evaluated at input 
+        temperature (dimensionless).
     '''
 
     if temp is None:
@@ -114,9 +120,35 @@ def db_dt(nu, temp=None):
     # Works because lim_nu->inf nu^2 x^2 e^x / (e^x - 1)^2 = 0.
     out[mask_large] = 0
 
-    out *= 2 * kboltz * nu ** 2 / clight ** 2
-
     if ndim_in == 0:
         return out[0]
     else:
         return out
+    
+def db_dt(nu, temp=None):
+    '''
+    Return derivative of blackbody function with respect to temperature,
+    evaluated at a given temperature.
+
+    Arguments
+    ---------
+    nu : (nfreq) array or float
+        Monotonically increasing array of frequencies in Hz.
+    cmb_temp : float, optional
+        Evaluate derivate at this temperature in Kelvin, defaults
+        to CMB temperature.
+
+    Returns
+    -------
+    db_dt : (nfreq) array or float
+        Derivative of blackbody function with respect to temperature,                                              
+        evaluated at input temperature. In units of W / (sr m^2 Hz K).
+    '''
+
+    kboltz = cs.kboltz()
+    clight = cs.clight()
+    out = dw_dt(nu, temp=temp)
+
+    out *= 2 * kboltz * nu ** 2 / clight ** 2
+
+    return out
