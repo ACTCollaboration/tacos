@@ -93,6 +93,61 @@ class BandPass():
 
         return cls(bandpass, nu)
 
+    @classmethod
+    def load_wmap_bandpass(cls, filename, band)
+        '''
+        Read WMAP bandpass file and return class instance.
+
+        Parameters
+        ----------
+        filename : str
+            Absolute path to file.
+        band : str
+            WMAP band, e.g. 'Q'.
+
+        Returns
+        -------
+        wmap_bandpass : bandpass.BandPass instance
+            Bandpass instance for requested WMAP band.
+
+        Raises
+        ------
+        ValueError
+            If band is not recognized.        
+        '''
+
+        bands = ['K', 'Ka', 'Q', 'V', 'W']
+        if band not in bands:
+            raise ValueError(f'Requested band : {band} not recognized. '
+                             f'Pick from {bands}.')
+        
+        if not os.path.splitext(filename)[1]:
+            filename = filename + '.hdf5'
+
+        with h5py.File(filename, 'r') as hfile:
+            
+            if band in ['K', 'Ka']:
+                nda = 1
+            elif band in ['Q', 'V']:
+                nda = 2
+            else:
+                nda = 4
+
+            # Use average of bandpasses for now.
+            for didx, da in enumerate(range(1 + nda)):
+                for rad in range(1, 3):
+                    
+                    bandname = band + str(da) + str(rad)
+
+                    if didx == 0:
+                        bandpass = hfile[f'{bandname}/bandpass'][()]
+                        nu = hfile[f'{bandname}/nu'][()]
+                    else:
+                        bandpass += hfile[f'{bandname}/bandpass'][()]
+            bandpass /= nda * 2
+                
+        return cls(bandpass, nu)
+
 def get_mixing_matrix(bandpasses, betas, dtype=np.float32):
     '''
     Return mixing matrix for given frequency bands and signal
