@@ -94,7 +94,7 @@ class BandPass():
         return cls(bandpass, nu)
 
     @classmethod
-    def load_wmap_bandpass(cls, filename, band)
+    def load_wmap_bandpass(cls, filename, band):
         '''
         Read WMAP bandpass file and return class instance.
 
