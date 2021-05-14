@@ -42,6 +42,47 @@ class BandPass():
         pass
 
     @classmethod
+    def load_act_bandpass(cls, filename, array):
+        '''
+        Read ACT bandpass file and return class instance.
+
+        Parameters
+        ----------
+        filename : str
+            Absolute path to file.
+        array : str
+            ACT array, e.g. 'pa2_f150'.
+
+        Returns
+        -------
+        act_bandpass : bandpass.BandPass instance
+            Bandpass instance for requested ACT array.
+
+        Raises
+        ------
+        ValueError
+            If array is not recognized.        
+        '''
+
+        arrays = ['pa1_f150', 'pa2_f150', 'pa3_f090', 'pa3_f150', 'pa4_f150',
+                  'pa4_f220', 'pa5_f090', 'pa5_f150', 'pa6_f090', 'pa6_f150',
+                  'ar1_f150', 'ar2_f220']
+
+        if array not in arrays:
+            raise ValueError(f'Requested array : {array} not recognized. '
+                             f'Pick from {arrays}.')
+        
+        if not os.path.splitext(filename)[1]:
+            filename = filename + '.hdf5'
+
+        with h5py.File(filename, 'r') as hfile:
+                    
+            bandpass = hfile[f'{array}/bandpass'][()]
+            nu = hfile[f'{array}/nu'][()]
+
+        return cls(bandpass, nu)
+
+    @classmethod
     def load_hfi_bandpass(cls, filename, band, psb_only=True,
                           nu_sq_corr=True):
         '''
@@ -83,7 +124,7 @@ class BandPass():
             if psb_only and band == '353':
                 bandname = band + '_psb'
             else:
-                bandanme = band
+                bandname = band
 
             bandpass = hfile[f'{bandname}/bandpass'][()]
             nu = hfile[f'{bandname}/nu'][()]
