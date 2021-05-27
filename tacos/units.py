@@ -40,7 +40,7 @@ def integrate_over_bandpass(signal, bandpass, nu, axis=-1):
     '''
     Integrate signal over bandpass.
 
-    Paramters
+    Parameters
     ---------
     signal : (..., nfreq) or (nfreq) array
         Signal as function if frequency
@@ -54,6 +54,7 @@ def integrate_over_bandpass(signal, bandpass, nu, axis=-1):
     Returns
     -------
     int_signal : (...) array or int
+        Integrated signal.
     '''
 
     # Reshape bandpass to allow broadcasting.

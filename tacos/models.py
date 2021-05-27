@@ -30,6 +30,14 @@ class DiffuseComponent(ABC):
         
         pass
 
+    @abstractmethod
+    def compute_interpolation(self):
+        
+        # Given range of betas, compute interpolation lookup table.
+        # For single beta: 1d table, for two betas 2d table etc.
+        
+        raise NotImplementedError()
+
 class Dust(DiffuseComponent):
     
     def __init__(self):

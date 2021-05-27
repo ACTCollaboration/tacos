@@ -56,39 +56,7 @@ class TestUnits(unittest.TestCase):
         nu = np.linspace(1e9, 410e9, num=10000)
         bandpass = np.ones_like(nu)
 
-        ##
-        #bandpass *= nu ** 2
-        #ba
-
         u_fact = units.convert_rj_to_cmb(bandpass, nu)
         u_fact_exp = 2.2348415733572202 # From Mathematica.
 
         self.assertAlmostEqual(u_fact, u_fact_exp, places=6)
-
-    def test_integrate_over_bandpass(self):
-
-        nu = np.linspace(0, 10, num=100)
-        signal = nu.copy()
-        bandpass = np.ones_like(nu)
-
-        out = units.integrate_over_bandpass(signal, bandpass, nu)
-        self.assertAlmostEqual(out, 50)
-
-        signal_2d = np.ones((2, nu.size)) * nu
-        out_2d = units.integrate_over_bandpass(signal_2d, bandpass, nu)
-        out_2d_exp = np.ones(2) * 50
-        np.testing.assert_allclose(out_2d, out_2d_exp)
-
-    def test_integrate_over_bandpass_axis(self):
-
-        nu = np.linspace(0, 10, num=100)
-        bandpass = np.ones_like(nu)
-
-        signal_3d = np.ones((3, nu.size, 2)) * nu[np.newaxis,:,np.newaxis]
-        out_3d = units.integrate_over_bandpass(signal_3d, bandpass, nu, axis=-2)
-        out_3d_exp = np.ones((3, 2)) * 50
-
-        np.testing.assert_allclose(out_3d, out_3d_exp)
-                         
-        
-        
