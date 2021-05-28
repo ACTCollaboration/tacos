@@ -1,4 +1,6 @@
 # helper utility functions
+from os import O_EXCL
+from pixell import enmap, utils
 
 import numpy as np
 
@@ -28,6 +30,77 @@ def atleast_nd(arr, n, axis=None):
         assert (n - arr.ndim) >= len(axis), 'More axes than dimensions to add'
         oaxis = tuple(range(n - arr.ndim - len(axis))) + tuple(axis) # prepend the extra dims
     return np.expand_dims(arr, oaxis)
+
+def symmetrize(arr, axis1=0, axis2=1, method='average'):
+    """Symmetrizes the input array along the specified axes.
+
+    Parameters
+    ----------
+    arr : array
+        Array to be symmetrized
+    axis1 : int, optional
+        The first axis e.g. the rows, by default 0
+    axis2 : int, optional
+        The second axis e.g. the columns, by default 1
+    method : str, optional
+        Symmetrization method, either 'average' or 'from_triu',
+        by default 'average'
+
+    Returns
+    -------
+    array
+        A symmetrized version of the input
+
+    Notes
+    -----
+    If the method is 'average,' the returned array is (a + a.T)/2, which
+    is the simple average of the off diagonals.
+
+    If the method is 'from_triu,' the returned array is (a + a.T - diag(a)),
+    which first sets the lower triangle to 0, and then replaces it with
+    the upper triangle.
+    """
+    # store wcs if imap is ndmap
+    if hasattr(arr, 'wcs'):
+        is_enmap = True
+        wcs = arr.wcs
+    else:
+        is_enmap = False
+
+    # sensibility check
+    assert axis2 > axis1, 'axis2 must be greater than axis1'
+
+    # get size of axis to be symmetrized
+    assert arr.shape[axis1] == arr.shape[axis2], 'Must symmetrize about axes of equal dimension'
+    N = arr.shape[axis1]
+
+    if method == 'average':
+        # take simple average
+        arr = (arr + np.moveaxis(arr, (axis1, axis2), (axis2, axis1)))/2
+
+    elif method == 'from_triu':
+        # diagonal goes to last axis, see np.diagonal
+        diagonal = np.diagonal(arr, axis1=axis1, axis2=axis2)
+
+        # this puts the diagonal into something of shape (N, N, ...)
+        # so it can broadcast against arr
+        diagonal = np.einsum('ab,...b->ab...', np.eye(N, dtype=int), diagonal)
+
+        # take the triu of the array
+        # first move axes to front of array
+        arr = np.moveaxis(arr, (axis1, axis2), (0, 1))
+        arr = np.triu(arr)
+
+        # symmetrize the array: add transpose then subtract diagonal
+        arr = (arr + np.moveaxis(arr, (0, 1), (1, 0))) - diagonal
+
+        # move axes back
+        arr = np.moveaxis(arr, (0, 1), (axis1, axis2))
+
+    if is_enmap:
+        arr =  enmap.ndmap(arr, wcs)
+    
+    return arr    
 
 def get_coadd_map(imap, ivar, axis=-4):
     """Returns the ivar-weighted coadd of the the imaps. The coaddition
@@ -63,3 +136,89 @@ def get_coadd_map(imap, ivar, axis=-4):
     # point errors in naive coadd calculation)
     coadd[single_nonzero_ivar_mask] = np.sum(imap * (ivar!=0), axis=axis, keepdims=True)[single_nonzero_ivar_mask]
     return coadd
+
+def get_coadd_map_covar(imap, icovar, imap_split_axis=-4, imap_icovar_axis=-3, icovar_split_axis=-5, icovar_axis1=-4, icovar_axis2=-3,
+                        return_icovar_coadd=False):
+    """Returns the icovar-weighted coadd of the imaps. The coaddition
+    occurs along the specified 'split' axes.
+
+    Parameters
+    ----------
+    imap : array-like
+        Maps to coadd
+    icovar : array-like
+        Inverse covariance at each pixel
+    imap_split_axis : int, optional
+        The axis in imaps corresponding to the independent splits, by default -4
+    imap_icovar_axis : int, optional
+        The axis in imaps corresponding to the covaried component, by default -3
+    icovar_split_axis : int, optional
+        The axis in icovar corresponding to the independent splits,, by default -5
+    icovar_axis1 : int, optional
+        The axis in imaps corresponding to the first covaried component, by default -4
+    icovar_axis2 : int, optional
+        The axis in imaps corresponding to the second covaried component, by default -3
+    return_icovar_coadd : bool, optional
+        Whether to return the icovar of the coadd, by default False
+
+    Returns
+    -------
+    array-like or tuple of array-like
+        The coadded map, with at least 4 dimensions. If return_icovar_coadd is True,
+        then also the inverse covariance of the coadd map.
+    """
+
+    # store wcs if imap is ndmap
+    if hasattr(imap, 'wcs'):
+        is_enmap = True
+        wcs = imap.wcs
+    else:
+        is_enmap = False
+
+    # first move the axes into a standard position
+    ndim = imap.ndim
+    imap = atleast_nd(imap, 4)
+    imap = np.moveaxis(imap, (imap_split_axis, imap_icovar_axis), (-4, -3))
+
+    icovar = atleast_nd(icovar, 5)
+    icovar = np.moveaxis(icovar, (icovar_split_axis, icovar_axis1, icovar_axis2), (-5, -4, -3))
+
+    # build matrix products
+    # icovar shape is (splits, pol1, pol2, ...), imap shape is (splits, pol1, ...)
+    num = np.einsum('...iabxy,...ibxy->...axy', icovar, imap)
+    iden = eigpow(np.sum(icovar, axis=-5), -1, axes=(-4, -3))
+
+    # perform final dot product and return
+    omap = np.einsum('...abxy,...bxy->...axy', iden, num)
+    omap = atleast_nd(omap, ndim)
+
+    if is_enmap:
+        omap = enmap.ndmap(omap, wcs)
+    if return_icovar_coadd:
+        omap = (omap, iden)
+
+    return omap
+
+def eigpow(A, e, axes=[-2, -1], rlim=None, alim=None):
+    """A hack around pixell.utils.eigpow which upgrades the data
+    precision to at least double precision if necessary prior to
+    operation.
+    """
+    dtype = A.dtype
+    
+    # cast to double precision if necessary
+    if np.dtype(dtype).itemsize < 8:
+        A = np.asanyarray(A, dtype=np.float64)
+        recast = True
+    else:
+        recast = False
+
+    O = utils.eigpow(A, e, axes=axes, rlim=rlim, alim=alim)
+
+    # cast back to input precision if necessary
+    if recast:
+        O = np.asanyarray(O, dtype=dtype)
+    
+    return O
+
+
