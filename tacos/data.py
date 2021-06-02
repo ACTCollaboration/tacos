@@ -30,9 +30,9 @@ config = sints.dconfig['tacos']
 # this is the main file format, which handles all inputs and outputs
 ext_dict = {
     'map': 'fits',
-    'covmat': 'fits',
-    'bandpass': 'hdf',
-    'beam': 'hdf',
+    'icovar': 'fits',
+    'bandpass': 'hdf5',
+    'beam': 'hdf5',
     }
 
 def data_str(type=None, instr=None, band=None, id=None, set=None, notes=''):
@@ -41,6 +41,8 @@ def data_str(type=None, instr=None, band=None, id=None, set=None, notes=''):
         type=type, instr=instr, band=band, id=id, set=set, notes=notes, ext=ext_dict[type]
         )
 
+# this is the main class representing a singular band of data, ie from one instrument
+# and one frequency (and optionally, one detector subset)
 class Channel:
 
     def __init__(self, instrument=None, band=None, id=None, correlated_noise=False):
@@ -60,7 +62,6 @@ class Channel:
         def band(self):
             return self._band
 
-  
         @property
         def id(self):
             return self._id 

@@ -164,8 +164,8 @@ def get_coadd_map_covar(imap, icovar, imap_split_axis=-4, imap_icovar_axis=-3, i
     Returns
     -------
     array-like or tuple of array-like
-        The coadded map, with at least 4 dimensions. If return_icovar_coadd is True,
-        then also the inverse covariance of the coadd map.
+        The coadded map, with at least 3 dimensions. If return_icovar_coadd is True,
+        then also the inverse covariance of the coadd map, with at least 4 dimensions.
     """
 
     # store wcs if imap is ndmap
@@ -186,16 +186,16 @@ def get_coadd_map_covar(imap, icovar, imap_split_axis=-4, imap_icovar_axis=-3, i
     # build matrix products
     # icovar shape is (splits, pol1, pol2, ...), imap shape is (splits, pol1, ...)
     num = np.einsum('...iabxy,...ibxy->...axy', icovar, imap)
-    iden = eigpow(np.sum(icovar, axis=-5), -1, axes=(-4, -3))
+    den = np.sum(icovar, axis=-5)
+    iden = eigpow(den, -1, axes=(-4, -3))
 
     # perform final dot product and return
     omap = np.einsum('...abxy,...bxy->...axy', iden, num)
-    omap = atleast_nd(omap, ndim)
 
     if is_enmap:
         omap = enmap.ndmap(omap, wcs)
     if return_icovar_coadd:
-        omap = (omap, iden)
+        omap = (omap, den)
 
     return omap
 
