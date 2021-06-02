@@ -120,7 +120,7 @@ class BandPass():
         return cls(bandpass, nu)
 
     @classmethod
-    def load_hfi_bandpass(cls, filename, band, psb_only=True,
+    def load_planck_bandpass(cls, filename, band, psb_only=True,
                           nu_sq_corr=True):
         '''
         Read Planck HFI bandpass file and return class instance.

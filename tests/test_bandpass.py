@@ -1,7 +1,7 @@
 import unittest
 import numpy as np
 
-from tacos import bandpass
+from tacos import bandpass, data
 
 class TestBandPass(unittest.TestCase):
 
@@ -34,6 +34,17 @@ class TestBandPass(unittest.TestCase):
 
         np.testing.assert_allclose(out_3d, out_3d_exp)
                          
-        
+    def test_integrate_over_bandpass_data(self):
+
+        instr_band = {}
+        instr_band['act'] = ['f090', 'f150', 'f220']
+        instr_band['planck'] = ['100', '143', '217', '353']
+        instr_band['wmap'] = ['K', 'Ka', 'Q', 'V', 'W']
+
+        # check each bandpass for normalization
+        for instr in instr_band:
+            for band in instr_band[instr]:
+                band_int = data.Channel(instr=instr, band=band).bandpass.integrate_over_bandpass(np.ones(1))
+                np.testing.assert_allclose(band_int, 1, atol=1e-6)
         
 

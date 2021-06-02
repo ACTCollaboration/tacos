@@ -34,7 +34,7 @@ with fits.open(args.filepath) as hdul:
         bandpasses[band]['nu'] = nu
         bandpasses[band]['bandpass'] = bandpass
 
-oname = 'bandpass_hfi_all_all_all.hdf5'
+oname = 'bandpass_planck_all_all_all.hdf5'
 with h5py.File(opj(args.odir, oname), 'w') as hfile:
 
     for band in bands:

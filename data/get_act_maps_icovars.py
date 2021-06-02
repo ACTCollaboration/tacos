@@ -52,8 +52,8 @@ for k, v in mapsets.items():
 
 # define what we are looping over
 # first do individual splits in same frequency, then do coadd of splits
-freqs = ['f90', 'f150', 'f220']
-splits = ['set0', 'set1', 'coadd']
+freqs = ['f150']
+splits = ['coadd']
 
 # output info
 if args.diagonal_icovar:

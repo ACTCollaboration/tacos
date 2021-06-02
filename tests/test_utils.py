@@ -1,6 +1,5 @@
 import numpy as np
 from tacos import utils
-
 def test_coadd_icovar():
     # make a dummy icov
     icov1 = np.array([[2,1,1], [1,2,1], [1,1,2]])[...,None,None]

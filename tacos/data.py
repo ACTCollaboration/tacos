@@ -47,7 +47,7 @@ class Channel:
 
     Parameters
     ----------
-    instrument : str
+    instr : str
         The instrument of the data set to load. Must be one of "act", "planck", "wmap", or "pysm"
     band : str
         The band name within the instrument
@@ -66,7 +66,7 @@ class Channel:
         Instrument must be one of "act", "planck", "wmap", or "pysm"
     """
 
-    def __init__(self, instrument, band, id=None, correlated_noise=False, notes=None,
+    def __init__(self, instr, band, id=None, correlated_noise=False, notes=None,
                     bandpass_kwargs=None):
         
         # modify args/kwargs
@@ -74,7 +74,7 @@ class Channel:
             bandpass_kwargs = {}
 
         # store metadata
-        self._instrument = instrument
+        self._instr = instr
         self._band = band
         if id is None:
             id = 'all'
@@ -90,30 +90,27 @@ class Channel:
             set = 'coadd'
 
         # maps and icovars
-        map_path = config['maps_path'] + f'{instrument}/'
-        map_path += data_str(type='map', instr=instrument, band=band, id=id, set=set, notes=notes)
-        self._map = enmap.read_map(map_path)
+        map_path = config['maps_path'] + f'{instr}/'
+        map_path += data_str(type='map', instr=instr, band=band, id=id, set=set, notes=notes)
+        self._map = utils.atleast_nd(enmap.read_map(map_path), 4) # (nsplit, npol, ny, nx)
 
-        covmat_path = config['covmats_path'] + f'{instrument}/'
-        covmat_path += data_str(type=covmat_type, instr=instrument, band=band, id=id, set=set, notes=notes)
-        self._covmat = enmap.read_map(covmat_path)
+        covmat_path = config['covmats_path'] + f'{instr}/'
+        covmat_path += data_str(type=covmat_type, instr=instr, band=band, id=id, set=set, notes=notes)
+        self._covmat = utils.atleast_nd(enmap.read_map(covmat_path), 5) # (nsplit, npol, npol, ny, nx)
 
         # bandpasses
-        # filenames vary by instrument
-        bandpass_path = config['bandpasses_path'] + f'{instrument}/'
-        if instrument == 'act':
-            bandpass_path += data_str(type='bandpass', instr=instrument, band='all', id=id, set='all', notes=notes)
+        bandpass_path = config['bandpasses_path'] + f'{instr}/'
+        bandpass_path += data_str(type='bandpass', instr=instr, band='all', id=id, set='all', notes=notes)
+        if instr == 'act':
             self._bandpass = BandPass.load_act_bandpass(bandpass_path, band, **bandpass_kwargs)
-        elif instrument == 'planck':
-            bandpass_path += data_str(type='bandpass', instr='hfi', band='all', id=id, set='all', notes=notes)
-            self._bandpass = BandPass.load_hfi_bandpass(bandpass_path, band, **bandpass_kwargs)
-        elif instrument == 'wmap':
-            bandpass_path += data_str(type='bandpass', instr=instrument, band='all', id=id, set='all', notes=notes)
+        elif instr == 'planck':
+            self._bandpass = BandPass.load_planck_bandpass(bandpass_path, band, **bandpass_kwargs)
+        elif instr == 'wmap':
             self._bandpass = BandPass.load_wmap_bandpass(bandpass_path, band, **bandpass_kwargs)
-        elif instrument == 'pysm':
+        elif instr == 'pysm':
             pass
         else:
-            raise ValueError(f'{instrument} must be one of "act", "planck", "wmap", or "pysm"')
+            raise ValueError(f'{instr} must be one of "act", "planck", "wmap", or "pysm"')
 
     def convolve_to_beam(self, beam):
         pass
@@ -122,8 +119,8 @@ class Channel:
         pass
 
     @property
-    def instrument(self):
-        return self._instrument
+    def instr(self):
+        return self._instr
 
     @property
     def band(self):
