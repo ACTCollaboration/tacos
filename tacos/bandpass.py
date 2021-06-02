@@ -63,7 +63,7 @@ class BandPass():
         return np.trapz(signal * bandpass, x=self.nu, axis=axis)
 
     @classmethod
-    def load_act_bandpass(cls, filename, array):
+    def load_act_bandpass(cls, filename, band, array=None):
         '''
         Read ACT bandpass file and return class instance.
 
@@ -84,12 +84,15 @@ class BandPass():
         ValueError
             If array is not recognized.        
         '''
-
+        bands = ['f090', 'f150', 'f220']
         arrays = ['pa1_f150', 'pa2_f150', 'pa3_f090', 'pa3_f150', 'pa4_f150',
-                  'pa4_f220', 'pa5_f090', 'pa5_f150', 'pa6_f090', 'pa6_f150',
-                  'ar1_f150', 'ar2_f220']
+                  'pa4_f220', 'pa5_f090', 'pa5_f150', 'pa6_f090', 'pa6_f150']
+        
+        if band not in bands:
+            raise ValueError(f'Requested band : {band} not recognized. '
+                             f'Pick from {bands}.')
 
-        if array not in arrays:
+        if array is not None and array not in arrays:
             raise ValueError(f'Requested array : {array} not recognized. '
                              f'Pick from {arrays}.')
         
@@ -97,9 +100,20 @@ class BandPass():
             filename = filename + '.hdf5'
 
         with h5py.File(filename, 'r') as hfile:
-                    
-            bandpass = hfile[f'{array}/bandpass'][()]
-            nu = hfile[f'{array}/nu'][()]
+            
+            # Use average of bandpasses for now.
+            band_arrays = []
+            for ar in arrays:
+                if band in ar:
+                    band_arrays.append(ar)
+
+            for i, ar in enumerate(band_arrays):
+                if i == 0:
+                    bandpass = hfile[f'{ar}/bandpass'][()]
+                    nu = hfile[f'{ar}/nu'][()]
+                else:
+                    bandpass += hfile[f'{ar}/bandpass'][()]
+            bandpass /= len(band_arrays)
 
         return cls(bandpass, nu)
 

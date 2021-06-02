@@ -37,7 +37,7 @@ map_f220_set1_fns = ['map_pa4_f220_night_set1.fits'],
 )
 
 mapsets.update(dict(
-    map_f90_coadd_fns = mapsets['map_f90_set0_fns'] + mapsets['map_f90_set1_fns'],
+    map_f90_coadd_fns = mapsets['map_f090_set0_fns'] + mapsets['map_f090_set1_fns'],
     map_f150_coadd_fns = mapsets['map_f150_set0_fns'] + mapsets['map_f150_set1_fns'],
     map_f220_coadd_fns = mapsets['map_f220_set0_fns'] + mapsets['map_f220_set1_fns'],
 ))
