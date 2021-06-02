@@ -71,8 +71,10 @@ class BandPass():
         ----------
         filename : str
             Absolute path to file.
-        array : str
-            ACT array, e.g. 'pa2_f150'.
+        band : str
+            Band name, either "f090", "f150", or "f220"
+        array : str, optional
+            ACT array, e.g. 'pa2_f150', by default None
 
         Returns
         -------
