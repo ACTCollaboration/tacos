@@ -53,10 +53,12 @@ class Channel:
         The band name within the instrument
     id : str, optional
         The subset of the instrument + band data, e.g. detectors, by default 'all'
-    correlated_noise : bool, optional
-        The noise model, by default False
+    set : str, optional
+        The data split, e.g. "set0", "set1", or "coadd
     notes : str, optional
         Additional identifier to append to data filenames, by default None
+    correlated_noise : bool, optional
+        The noise model, by default False
     bandpass_kwargs : dict, optional
         kwargs to pass to BandPass.load_<instrument>_bandpass, by default None
 
@@ -66,7 +68,7 @@ class Channel:
         Instrument must be one of "act", "planck", "wmap", or "pysm"
     """
 
-    def __init__(self, instr, band, id=None, correlated_noise=False, notes=None,
+    def __init__(self, instr, band, id=None, set=None, notes=None, correlated_noise=False, 
                     bandpass_kwargs=None):
         
         # modify args/kwargs
@@ -79,15 +81,17 @@ class Channel:
         if id is None:
             id = 'all'
         self._id = id
-        self._correlated_noise = correlated_noise
+        if set is None:
+            set = 'coadd'
+        self._set = set
         self._notes = notes
+        self._correlated_noise = correlated_noise
 
         # store data
         if self.correlated_noise:
             pass
         else:
             covmat_type = 'icovar'
-            set = 'coadd'
 
         # maps and icovars
         map_path = config['maps_path'] + f'{instr}/'
@@ -131,14 +135,18 @@ class Channel:
         return self._id 
 
     @property
-    def correlated_noise(self):
-        if self._correlated_noise:
-            raise NotImplementedError('Correlated noise not yet implemented')
-        return self._correlated_noise
+    def set(self):
+        return self._set 
 
     @property
     def notes(self):
         return self._notes
+
+    @property
+    def correlated_noise(self):
+        if self._correlated_noise:
+            raise NotImplementedError('Correlated noise not yet implemented')
+        return self._correlated_noise
 
     @property
     def map(self):

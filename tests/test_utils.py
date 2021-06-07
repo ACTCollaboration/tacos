@@ -15,7 +15,7 @@ def test_coadd_icovar():
     imap = np.array([imap1, imap2])
 
     # get coadd
-    cmap, ccov = utils.get_coadd_map_covar(imap, icov, return_icovar_coadd=True)
+    cmap, ccov = utils.get_coadd_map_icovar(imap, icov, return_icovar_coadd=True)
 
     omap = np.full((3,10,10), 3)
     assert np.allclose(cmap, omap, rtol=0, atol=1e-14)

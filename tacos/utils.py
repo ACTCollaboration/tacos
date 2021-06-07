@@ -89,7 +89,8 @@ def symmetrize(arr, axis1=0, axis2=1, method='average'):
         # take the triu of the array
         # first move axes to front of array
         arr = np.moveaxis(arr, (axis1, axis2), (0, 1))
-        arr = np.triu(arr)
+        tril_idxs = np.tril_indices(N, -1)
+        arr[tril_idxs] *= 0
 
         # symmetrize the array: add transpose then subtract diagonal
         arr = (arr + np.moveaxis(arr, (0, 1), (1, 0))) - diagonal
@@ -137,7 +138,7 @@ def get_coadd_map(imap, ivar, axis=-4):
     coadd[single_nonzero_ivar_mask] = np.sum(imap * (ivar!=0), axis=axis, keepdims=True)[single_nonzero_ivar_mask]
     return coadd
 
-def get_coadd_map_covar(imap, icovar, imap_split_axis=-4, imap_icovar_axis=-3, icovar_split_axis=-5, icovar_axis1=-4, icovar_axis2=-3,
+def get_coadd_map_icovar(imap, icovar, imap_split_axis=-4, imap_icovar_axis=-3, icovar_split_axis=-5, icovar_axis1=-4, icovar_axis2=-3,
                         return_icovar_coadd=False):
     """Returns the icovar-weighted coadd of the imaps. The coaddition
     occurs along the specified 'split' axes.
@@ -204,6 +205,13 @@ def eigpow(A, e, axes=[-2, -1], rlim=None, alim=None):
     precision to at least double precision if necessary prior to
     operation.
     """
+    # store wcs if imap is ndmap
+    if hasattr(A, 'wcs'):
+        is_enmap = True
+        wcs = A.wcs
+    else:
+        is_enmap = False
+
     dtype = A.dtype
     
     # cast to double precision if necessary
@@ -218,7 +226,28 @@ def eigpow(A, e, axes=[-2, -1], rlim=None, alim=None):
     # cast back to input precision if necessary
     if recast:
         O = np.asanyarray(O, dtype=dtype)
-    
+
+    if is_enmap:
+        O =  enmap.ndmap(O, wcs)
+
     return O
 
+def lmax_from_wcs(wcs, method='zach'):
+    """Get lmax from wcs, either "k-space" or "CAR" lmax (by method "zach" or "adri" respectively).
+    """
+    if method == 'zach':
+        num = 360
+    elif method == 'adri':
+        num = 180
+    else:
+        raise ValueError(f'Only "zach" or "adri" methods supported')
+    den = abs(wcs.wcs.cdelt[1])
+    return int(num/den)
+
+def fwhm_from_ell_bell(ell, bell):
+    assert ell > 0, "ell must be greather than 0"
+    assert bell < 1, "bell must be less than 1"
+    sigma = np.sqrt(-2 * np.log(bell) / (ell*(ell+1)))
+    fwhm = sigma * np.sqrt(8 * np.log(2))
+    return fwhm
 

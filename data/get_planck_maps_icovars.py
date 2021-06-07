@@ -96,20 +96,26 @@ for freq in freqs:
         oshape = (len(pdata), imaps.shape[-3]) + imaps.shape[-3:] # shape is (nmap, npol, npol, ny, nx)
         icovars = enmap.zeros(oshape, wcs)
         for i, p in enumerate(pdata):
-            icovars_p = np.array([reproject.enmap_from_healpix_interp(p[j], shape, wcs, rot=None)/1e-6 for j in range(4, 10)])
+            icovars_p = np.array([reproject.enmap_from_healpix_interp(p[j], shape, wcs, rot=None)/1e-12 for j in range(4, 10)])
             icovars[i][np.triu_indices(imaps.shape[-3])] = icovars_p
-        
-        # weight by pixel area factors
-        act_pixsize = enmap.pixsizemap(shape, wcs)
-        assert np.unique([p[0].size for p in pdata]).size == 1 # make sure all maps have same nside
-        hp_pixsize = hp.nside2pixarea(hp.npix2nside(pdata[0][0].size))
-        icovars *= (act_pixsize / hp_pixsize)
     
         # correct for iau convention on U pol crosses
         for i in range(icovars.shape[-4]):
             for j in range(i+1, icovars.shape[-3]): # off-diagonals only
                 if (i, j) == (0, 2) or (i, j) == (1, 2):
                     icovars[:, i, j] *= -1
+
+        # symmetrize the covars
+        icovars = utils.symmetrize(icovars, axis1=-4, axis2=-3, method='from_triu')
+
+        # go from covariance to inverse covariance
+        icovars = utils.eigpow(icovars, -1, axes=(-4, -3)) # shape is (nmap, npol, npol, ny, nx)
+
+        # weight by pixel area factors
+        act_pixsize = enmap.pixsizemap(shape, wcs)
+        assert np.unique([p[0].size for p in pdata]).size == 1 # make sure all maps have same nside
+        hp_pixsize = hp.nside2pixarea(hp.npix2nside(pdata[0][0].size))
+        icovars *= (act_pixsize / hp_pixsize)
 
         # get diagonal version of icovars, if passed
         if args.diagonal_icovar:
@@ -126,12 +132,9 @@ for freq in freqs:
         imaps_monopole = np.broadcast_to(imaps_monopole, imaps.shape, subok=True)
         imaps_zero_monopole = imaps - imaps_monopole
 
-        # symmetrize the covars
-        icovars = utils.symmetrize(icovars, axis1=-4, axis2=-3, method='from_triu')
-
         # coadd
-        map_coadd, icovar_coadd = utils.get_coadd_map_covar(imaps_zero_monopole, icovars, return_icovar_coadd=True)
-        monopole_coadd = utils.get_coadd_map_covar(imaps_monopole, icovars)
+        map_coadd, icovar_coadd = utils.get_coadd_map_icovar(imaps_zero_monopole, icovars, return_icovar_coadd=True)
+        monopole_coadd = utils.get_coadd_map_icovar(imaps_monopole, icovars)
 
         # overwrite output for single-map mapsets if necessary
         if not args.single_set_coadd:

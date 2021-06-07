@@ -52,8 +52,8 @@ for k, v in mapsets.items():
 
 # define what we are looping over
 # first do individual splits in same frequency, then do coadd of splits
-freqs = ['f150']
-splits = ['coadd']
+freqs = ['f090', 'f150', 'f220']
+splits = ['set0', 'set1', 'coadd']
 
 # output info
 if args.diagonal_icovar:
@@ -98,6 +98,9 @@ for freq in freqs:
                         icovars[:, i, j] *= -1
                         icovars[:, j, i] *= -1
 
+        # symmetrize the covars
+        icovars = utils.symmetrize(icovars, axis1=-4, axis2=-3)
+
         # get diagonal version of icovars, if passed
         if args.diagonal_icovar:
             icovars = np.diagonal(icovars, axis1=-4, axis2=-3)
@@ -113,12 +116,10 @@ for freq in freqs:
         imaps_monopole = np.broadcast_to(imaps_monopole, imaps.shape, subok=True)
         imaps_zero_monopole = imaps - imaps_monopole
 
-        # symmetrize the covars
-        icovars = utils.symmetrize(icovars, axis1=-4, axis2=-3)
 
         # coadd
-        map_coadd, icovar_coadd = utils.get_coadd_map_covar(imaps_zero_monopole, icovars, return_icovar_coadd=True)
-        monopole_coadd = utils.get_coadd_map_covar(imaps_monopole, icovars)
+        map_coadd, icovar_coadd = utils.get_coadd_map_icovar(imaps_zero_monopole, icovars, return_icovar_coadd=True)
+        monopole_coadd = utils.get_coadd_map_icovar(imaps_monopole, icovars)
 
         # overwrite output for single-map mapsets if necessary
         if not args.single_set_coadd:
@@ -130,7 +131,7 @@ for freq in freqs:
         extra = {'POLCCONV': 'IAU'}
 
         omap_fn = data.data_str(type='map', instr='act', band=freq, id='all', set=split)
-        #enmap.write_map(mappath + omap_fn, map_coadd, extra=extra)
+        enmap.write_map(mappath + omap_fn, map_coadd, extra=extra)
 
         ocoadd_fn = data.data_str(type='icovar', instr='act', band=freq, id='all', set=split)
-        #enmap.write_map(covmatpath + ocoadd_fn, icovar_coadd, extra=extra)
+        enmap.write_map(covmatpath + ocoadd_fn, icovar_coadd, extra=extra)

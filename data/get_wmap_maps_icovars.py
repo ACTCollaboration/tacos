@@ -63,9 +63,10 @@ shape, wcs = enmap.read_map_geometry(data.config['raw_path'] + 'act/map_pa4_f150
 shape = shape[-2:]
 
 # for each combo, grab maps and ivars and get coadd
-for f, freq in enumerate(freqs):
+for freq in freqs:
     for split in splits:
         print(f'Working on {freq}, {split}')
+        f = freqs.index(freq)
 
         map_fns = mapsets[f'map_{freq}_{split}_fns']
         wdata_maps = [hp.read_map(rawpath + m, field=None, hdu=1) for m in map_fns]
@@ -89,34 +90,32 @@ for f, freq in enumerate(freqs):
             nobs_w = np.array([reproject.enmap_from_healpix_interp(w[j], shape, wcs, rot=None) for j in range(4)])
             icovars_w = np.zeros(oshape[1:]) # on per-map basis
 
-            # fill covariance matrix with uK^2 entries
+            # fill inverse-covariance matrix with 1/uK^2 entries
             for j, comp in enumerate([(0,0), (1,1), (1,2), (2,2)]):
                 m, n = comp
                 if j == 0:
                     sig2 = sig2_temp[f]
                 else:
                     sig2 = sig2_pol[f]
-                icovars_w[m, n] = sig2 / nobs_w[j]
-                icovars_w[n, m] = sig2 / nobs_w[j]
-
-            # get icovar matrix
-            icovars_w[0, 0] = 1/icovars_w[0, 0]
-            icovars_w[1:, 1:] = utils.eigpow(icovars_w[1:, 1:], -1, axes=(-4, -3))
+                icovars_w[m, n] = nobs_w[j] / sig2
             
             # store data
             icovars[i] = icovars_w
-        
-        # weight by pixel area factors
-        act_pixsize = enmap.pixsizemap(shape, wcs)
-        assert np.unique([w[0].size for w in wdata_nobs]).size == 1 # make sure all maps have same nside
-        hp_pixsize = hp.nside2pixarea(hp.npix2nside(wdata_nobs[0][0].size))
-        icovars *= (act_pixsize / hp_pixsize)
     
         # correct for iau convention on U pol crosses
         for i in range(icovars.shape[-4]):
             for j in range(i+1, icovars.shape[-3]): # off-diagonals only
                 if (i, j) == (0, 2) or (i, j) == (1, 2):
                     icovars[:, i, j] *= -1
+
+        # symmetrize the covars
+        icovars = utils.symmetrize(icovars, axis1=-4, axis2=-3, method='from_triu')
+
+        # weight by pixel area factors
+        act_pixsize = enmap.pixsizemap(shape, wcs)
+        assert np.unique([w[0].size for w in wdata_nobs]).size == 1 # make sure all maps have same nside
+        hp_pixsize = hp.nside2pixarea(hp.npix2nside(wdata_nobs[0][0].size))
+        icovars *= (act_pixsize / hp_pixsize)
 
         # get diagonal version of icovars, if passed
         if args.diagonal_icovar:
@@ -133,12 +132,9 @@ for f, freq in enumerate(freqs):
         imaps_monopole = np.broadcast_to(imaps_monopole, imaps.shape, subok=True)
         imaps_zero_monopole = imaps - imaps_monopole
 
-        # symmetrize the covars
-        icovars = utils.symmetrize(icovars, axis1=-4, axis2=-3, method='from_triu')
-
         # coadd
-        map_coadd, icovar_coadd = utils.get_coadd_map_covar(imaps_zero_monopole, icovars, return_icovar_coadd=True)
-        monopole_coadd = utils.get_coadd_map_covar(imaps_monopole, icovars)
+        map_coadd, icovar_coadd = utils.get_coadd_map_icovar(imaps_zero_monopole, icovars, return_icovar_coadd=True)
+        monopole_coadd = utils.get_coadd_map_icovar(imaps_monopole, icovars)
 
         # overwrite output for single-map mapsets if necessary
         if not args.single_set_coadd:
