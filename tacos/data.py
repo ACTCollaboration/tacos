@@ -10,7 +10,7 @@ import yaml
 
 from soapack import interfaces as sints
 from pixell import enmap
-from tacos import utils
+from tacos import utils, beam
 from tacos.bandpass import BandPass
 
 # copied from soapack.interfaces
@@ -59,6 +59,8 @@ class Channel:
         Additional identifier to append to data filenames, by default None
     correlated_noise : bool, optional
         The noise model, by default False
+    beam_kwargs : dict, optional
+        kwargs to pass to beam.load_<instrument>_beam, by default None
     bandpass_kwargs : dict, optional
         kwargs to pass to BandPass.load_<instrument>_bandpass, by default None
 
@@ -69,9 +71,11 @@ class Channel:
     """
 
     def __init__(self, instr, band, id=None, set=None, notes=None, correlated_noise=False, 
-                    bandpass_kwargs=None):
+                    beam_kwargs=None, bandpass_kwargs=None):
         
         # modify args/kwargs
+        if beam_kwargs is None:
+            beam_kwargs = {}
         if bandpass_kwargs is None:
             bandpass_kwargs = {}
 
@@ -101,6 +105,11 @@ class Channel:
         covmat_path = config['covmats_path'] + f'{instr}/'
         covmat_path += data_str(type=covmat_type, instr=instr, band=band, id=id, set=set, notes=notes)
         self._covmat = utils.atleast_nd(enmap.read_map(covmat_path), 5) # (nsplit, npol, npol, ny, nx)
+
+        # beams
+        beam_path = config['beams_path'] + f'{instr}/'
+        beam_path += data_str(type='beam', instr=instr, band='all', id=id, set='all', notes=notes)
+        self.beam = beam.load_planck_beam(beam_path, band, **beam_kwargs)
 
         # bandpasses
         bandpass_path = config['bandpasses_path'] + f'{instr}/'

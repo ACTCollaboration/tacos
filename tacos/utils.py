@@ -236,9 +236,9 @@ def lmax_from_wcs(wcs, method='zach'):
     """Get lmax from wcs, either "k-space" or "CAR" lmax (by method "zach" or "adri" respectively).
     """
     if method == 'zach':
-        num = 360
-    elif method == 'adri':
         num = 180
+    elif method == 'adri':
+        num = 90
     else:
         raise ValueError(f'Only "zach" or "adri" methods supported')
     den = abs(wcs.wcs.cdelt[1])
