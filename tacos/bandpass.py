@@ -87,8 +87,7 @@ class BandPass():
             If array is not recognized.        
         '''
         bands = ['f090', 'f150', 'f220']
-        arrays = ['pa1_f150', 'pa2_f150', 'pa3_f090', 'pa3_f150', 'pa4_f150',
-                  'pa4_f220', 'pa5_f090', 'pa5_f150', 'pa6_f090', 'pa6_f150']
+        arrays = ['pa4_f150', 'pa4_f220', 'pa5_f090', 'pa5_f150', 'pa6_f090', 'pa6_f150']
         
         if band not in bands:
             raise ValueError(f'Requested band : {band} not recognized. '
@@ -217,7 +216,7 @@ class BandPass():
                     
                     bandname = band + str(da) + str(rad)
 
-                    if didx == 0:
+                    if didx == 0 and rad == 1:
                         bandpass = hfile[f'{bandname}/bandpass'][()]
                         nu = hfile[f'{bandname}/nu'][()]
                     else:

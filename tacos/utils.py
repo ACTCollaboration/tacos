@@ -245,6 +245,8 @@ def lmax_from_wcs(wcs, method='zach'):
     return int(num/den)
 
 def fwhm_from_ell_bell(ell, bell):
+    """Given a point bell(ell) for some beam window function, return the fwhm corresponding to hp.gauss_beam.
+    """
     assert ell > 0, "ell must be greather than 0"
     assert bell < 1, "bell must be less than 1"
     sigma = np.sqrt(-2 * np.log(bell) / (ell*(ell+1)))

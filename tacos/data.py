@@ -109,7 +109,14 @@ class Channel:
         # beams
         beam_path = config['beams_path'] + f'{instr}/'
         beam_path += data_str(type='beam', instr=instr, band='all', id=id, set='all', notes=notes)
-        self.beam = beam.load_planck_beam(beam_path, band, **beam_kwargs)
+        if instr == 'act':
+            self._beam = beam.load_act_beam(beam_path, band, **beam_kwargs)
+        if instr == 'planck':
+            self._beam = beam.load_planck_beam(beam_path, band, **beam_kwargs)
+        if instr == 'wmap':
+            self._beam = beam.load_wmap_beam(beam_path, band, **beam_kwargs)
+        elif instr == 'pysm':
+            pass
 
         # bandpasses
         bandpass_path = config['bandpasses_path'] + f'{instr}/'
@@ -125,10 +132,10 @@ class Channel:
         else:
             raise ValueError(f'{instr} must be one of "act", "planck", "wmap", or "pysm"')
 
-    def convolve_to_beam(self, beam):
+    def convolve_to_beam(self, bell):
         pass
 
-    def convolve_with_beam(self, beam):
+    def convolve_with_beam(self, bell):
         pass
 
     @property
@@ -164,6 +171,10 @@ class Channel:
     @property
     def covmat(self):
         return self._covmat
+
+    @property
+    def beam(self):
+        return self._beam
 
     @property
     def bandpass(self):
