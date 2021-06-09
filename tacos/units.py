@@ -12,7 +12,7 @@ def convert_rj_to_cmb(bandpass, nu):
 
     Parameters
     ----------
-    bandpass : (nfreq) array
+    bandpass : (nfreq) array or callable
         Bandpass 
     nu : (nfreq) array
         Monotonically increasing array of frequencies in Hz.
@@ -25,6 +25,8 @@ def convert_rj_to_cmb(bandpass, nu):
     '''
     
     nu = np.atleast_1d(nu)
+    if callable(bandpass):
+        bandpass = bandpass(nu)
     bandpass = np.atleast_1d(bandpass)
 
     # Note, typo in beyondplanck 2011.05609: eq. 39 uses h instead of kb.
@@ -35,34 +37,6 @@ def convert_rj_to_cmb(bandpass, nu):
     denominator = np.trapz(w_prime * bandpass, x=nu)
 
     return numerator / denominator
-
-def integrate_over_bandpass(signal, bandpass, nu, axis=-1):
-    '''
-    Integrate signal over bandpass.
-
-    Parameters
-    ---------
-    signal : (..., nfreq) or (nfreq) array
-        Signal as function if frequency
-    bandpass : (nfreq) array
-        Bandpass
-    nu : (nfreq) array
-        Monotonically increasing array of frequencies in Hz.
-    axis : int, optional
-        Frequency axis in signal array.
-
-    Returns
-    -------
-    int_signal : (...) array or int
-        Integrated signal.
-    '''
-
-    # Reshape bandpass to allow broadcasting.
-    bc_shape = np.ones(signal.ndim, dtype=int)
-    bc_shape[axis] = bandpass.size
-    bandpass = bandpass.reshape(tuple(bc_shape))
-
-    return np.trapz(signal * bandpass, x=nu, axis=axis)
 
 def dw_dt(nu, temp=None):
     '''

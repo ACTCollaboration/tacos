@@ -1,0 +1,33 @@
+# hardcoded dictionary of bandpass limit information by instrument band
+f090:
+  int_low: 1
+  int_high: 2
+  fwhm_low: 3
+  fwhm_high: 4
+
+f150: 1
+
+f220: 2
+
+'100':
+  int_low: 75e9
+  int_high: 150e9
+
+'143': 2
+
+'217': 5
+
+'353': 6
+
+'353_psb': 7
+
+K: 1
+
+Ka: 2
+
+Q: 3
+
+V: 4
+
+W: 5
+

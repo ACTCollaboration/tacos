@@ -1,10 +1,13 @@
 import numpy as np
+from scipy.interpolate import interp1d
 import os 
 
 from pixell import enmap
 import h5py
 
-from tacos import units
+from tacos import units, utils
+
+config = utils.config_from_yaml_resource('configs/bandpass_config.yaml')
 
 class BandPass():
     '''
@@ -25,26 +28,41 @@ class BandPass():
     nu : (nfreq) array
         Frequencies in Hz.
     c_fact_rj_to_cmb : float
-        Converstion factor to go from a flat RJ spectrum to thermodynamic
+        Conversion factor to go from a flat RJ spectrum to thermodynamic
         units.    
     '''
 
-    def __init__(self, bandpass, nu):
+    def __init__(self, bandpass, nu, int_low=None, int_high=None, nu_iterator='linspace', **nu_iterator_kwargs):
         
-        self.bandpass = bandpass / np.trapz(bandpass, x=nu)
-        self.nu = nu
+        # normalize the bandpass to have an integral of 1 over frequency
+        bandpass = bandpass / np.trapz(bandpass, x=nu)
+
+        # Compute 1D interpolation and store as attribute.
+        self.bandpass = interp1d(nu, bandpass, kind='linear', bounds_error=False, fill_value=0.0)
+
+        # Prepare integration
+        if int_low is None:
+            int_low = nu.min()
+        if int_high is None:
+            int_high = nu.max()
+        if nu_iterator == 'linspace':
+            N = nu_iterator_kwargs.get('N', 500)
+            self.nu = np.linspace(int_low, int_high, N)
+        elif nu_iterator_kwargs == 'arange':
+            delta_nu = nu_iterator_kwargs.get('delta_nu', 0.1e9)
+            self.nu = np.arange(int_low, int_high, delta_nu)
+
+        # Store unit conversion as an attribute
         self.c_fact_rj_to_cmb = units.convert_rj_to_cmb(
             self.bandpass, self.nu)
 
-        # Compute 1D interpolation and store as attribute.
-
-    def integrate_over_bandpass(self, signal, axis=-1):
+    def integrate_signal(self, signal, axis=-1):
         '''
         Integrate signal over bandpass.
 
         Parameters
         ---------
-        signal : (..., nfreq) or (nfreq) array
+        signal : (..., nfreq) or (nfreq) array or callable
             Signal as function of frequency
         axis : int, optional
             Frequency axis in signal array.
@@ -55,10 +73,17 @@ class BandPass():
             Integrated signal.
         '''
 
+        # Convert callables to arrays, if necessary
+        bandpass = self.bandpass(self.nu)
+        
+        if callable(signal):
+            signal = signal(self.nu)
+        signal = np.atleast_1d(signal)
+
         # Reshape bandpass to allow broadcasting.
         bc_shape = np.ones(signal.ndim, dtype=int)
-        bc_shape[axis] = self.bandpass.size
-        bandpass = self.bandpass.reshape(tuple(bc_shape))
+        bc_shape[axis] = bandpass.size
+        bandpass = bandpass.reshape(tuple(bc_shape))
 
         return np.trapz(signal * bandpass, x=self.nu, axis=axis)
 
@@ -168,7 +193,10 @@ class BandPass():
             if nu_sq_corr:
                 bandpass *= nu ** 2
 
-        return cls(bandpass, nu)
+        int_low = float(config[bandname]['int_low'])
+        int_high = float(config[bandname]['int_high'])
+
+        return cls(bandpass, nu, int_low=int_low, int_high=int_high)
 
     @classmethod
     def load_wmap_bandpass(cls, filename, band):

@@ -1,8 +1,10 @@
 # helper utility functions
-from os import O_EXCL
 from pixell import enmap, utils
 
 import numpy as np
+import yaml
+
+import pkgutil
 
 def atleast_nd(arr, n, axis=None):
     """Return a buffer whose new shape has at least n dimensions.
@@ -253,3 +255,13 @@ def fwhm_from_ell_bell(ell, bell):
     fwhm = sigma * np.sqrt(8 * np.log(2))
     return fwhm
 
+# copied from soapack.interfaces
+def config_from_yaml_file(filename):
+    with open(filename) as f:
+        config = yaml.safe_load(f)
+    return config
+
+def config_from_yaml_resource(resource):
+    f = pkgutil.get_data('tacos', resource).decode()
+    config = yaml.safe_load(f)
+    return config

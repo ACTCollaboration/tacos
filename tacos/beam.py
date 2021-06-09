@@ -19,7 +19,7 @@ def load_act_beam(filename, band, array=None):
     band : str
         ACT band, e.g. 'f090'.
     array : str, optional
-        ACT array, e.g. 'pa2_f150', by default None
+        ACT array, e.g. 'pa5_f150', by default None
 
     Returns
     -------

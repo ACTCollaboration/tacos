@@ -7,20 +7,15 @@
 
 import numpy as np
 import yaml
+import pkgutil
 
 from soapack import interfaces as sints
 from pixell import enmap
 from tacos import utils, beam
 from tacos.bandpass import BandPass
 
-# copied from soapack.interfaces
-def config_from_yaml(filename):
-    with open(filename) as f:
-        config = yaml.safe_load(f)
-    return config
-
 # load config to data products
-config = sints.dconfig['tacos']
+config = utils.config_from_yaml_resource('configs/data_config.yaml')['tacos']
 
 # this is the main file format, which handles all inputs and outputs
 ext_dict = {
@@ -54,7 +49,7 @@ class Channel:
     id : str, optional
         The subset of the instrument + band data, e.g. detectors, by default 'all'
     set : str, optional
-        The data split, e.g. "set0", "set1", or "coadd
+        The data split, e.g. "set0", "set1", or "coadd"
     notes : str, optional
         Additional identifier to append to data filenames, by default None
     correlated_noise : bool, optional
