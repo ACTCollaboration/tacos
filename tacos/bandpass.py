@@ -30,11 +30,17 @@ class BandPass():
     c_fact_rj_to_cmb : float
         Conversion factor to go from a flat RJ spectrum to thermodynamic
         units.    
+
+    Notes
+    -----
+    If rtol or atol are greater than 0, or if a nu_iterator is provided, such that
+    the bandpass changes from the raw data in any way, the output bandpass is renormalized
+    such that its integral is still 1 over its domain.
     '''
 
     def __init__(self, bandpass, nu, trim_zeros=False, rtol=0., atol=0., nu_iterator=None, nu_low=None, nu_high=None, N=500, delta_nu=0.1e9):
         # Because kwargs may be supplied via a yaml file, numeric kwargs are explicitly cast to correct type
-        
+
         # Trim leading and trailing zeros
         if trim_zeros:
             nu, bandpass = utils.trim_zeros(nu, ref=bandpass, rtol=float(rtol), atol=float(atol), return_ref=True)
