@@ -32,25 +32,39 @@ class BandPass():
         units.    
     '''
 
-    def __init__(self, bandpass, nu, int_low=None, int_high=None, nu_iterator='linspace', **nu_iterator_kwargs):
+    def __init__(self, bandpass, nu, trim_zeros=False, rtol=0., atol=0., nu_iterator=None, nu_low=None, nu_high=None, N=500, delta_nu=0.1e9):
+        # Because kwargs may be supplied via a yaml file, numeric kwargs are explicitly cast to correct type
         
+        # Trim leading and trailing zeros
+        if trim_zeros:
+            nu, bandpass = utils.trim_zeros(nu, ref=bandpass, rtol=float(rtol), atol=float(atol), return_ref=True)
+        
+        if nu_iterator is None:
+            self.nu = nu
+        else:
+            # get bounds of new nu
+            if nu_low is None:
+                nu_low = nu.min()
+            if nu_high is None:
+                nu_high = nu.max()
+
+            # get new nu
+            if nu_iterator == 'linspace':
+                N = N
+                self.nu = np.linspace(float(nu_low), float(nu_high), int(N))
+            elif nu_iterator == 'arange':
+                delta_nu = delta_nu
+                self.nu = np.arange(float(nu_low), float(nu_high), float(delta_nu))
+
+            # get new bandpass
+            bandpass = interp1d(nu, bandpass, kind='linear', bounds_error=False, fill_value=0.0)
+            bandpass = bandpass(self.nu)
+
         # normalize the bandpass to have an integral of 1 over frequency
-        bandpass = bandpass / np.trapz(bandpass, x=nu)
+        bandpass = bandpass / np.trapz(bandpass, x=self.nu)
 
         # Compute 1D interpolation and store as attribute.
-        self.bandpass = interp1d(nu, bandpass, kind='linear', bounds_error=False, fill_value=0.0)
-
-        # Prepare integration
-        if int_low is None:
-            int_low = nu.min()
-        if int_high is None:
-            int_high = nu.max()
-        if nu_iterator == 'linspace':
-            N = nu_iterator_kwargs.get('N', 500)
-            self.nu = np.linspace(int_low, int_high, N)
-        elif nu_iterator_kwargs == 'arange':
-            delta_nu = nu_iterator_kwargs.get('delta_nu', 0.1e9)
-            self.nu = np.arange(int_low, int_high, delta_nu)
+        self.bandpass = interp1d(self.nu, bandpass, kind='linear', bounds_error=False, fill_value=0.0)
 
         # Store unit conversion as an attribute
         self.c_fact_rj_to_cmb = units.convert_rj_to_cmb(
@@ -141,7 +155,8 @@ class BandPass():
                     bandpass += hfile[f'{ar}/bandpass'][()]
             bandpass /= len(band_arrays)
 
-        return cls(bandpass, nu)
+        bandpass_kwargs = config[band]
+        return cls(bandpass, nu, **bandpass_kwargs)
 
     @classmethod
     def load_planck_bandpass(cls, filename, band, psb_only=True,
@@ -193,10 +208,8 @@ class BandPass():
             if nu_sq_corr:
                 bandpass *= nu ** 2
 
-        int_low = float(config[bandname]['int_low'])
-        int_high = float(config[bandname]['int_high'])
-
-        return cls(bandpass, nu, int_low=int_low, int_high=int_high)
+        bandpass_kwargs = config[bandname]
+        return cls(bandpass, nu, **bandpass_kwargs)
 
     @classmethod
     def load_wmap_bandpass(cls, filename, band):
@@ -251,7 +264,8 @@ class BandPass():
                         bandpass += hfile[f'{bandname}/bandpass'][()]
             bandpass /= nda * 2
                 
-        return cls(bandpass, nu)
+        bandpass_kwargs = config[band]
+        return cls(bandpass, nu, **bandpass_kwargs)
 
 def get_mixing_matrix(bandpasses, betas, dtype=np.float32):
     '''

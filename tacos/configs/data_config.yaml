@@ -4,3 +4,9 @@ tacos:
     bandpasses_path: "/projects/ACT/zatkins/data/ACTCollaboration/tacos/bandpasses/"
     beams_path: "/projects/ACT/zatkins/data/ACTCollaboration/tacos/beams/"
     raw_path: "/projects/ACT/zatkins/data/ACTCollaboration/tacos/raw/"
+
+ext_dict:
+    map: 'fits'
+    icovar: 'fits'
+    bandpass: 'hdf5'
+    beam: 'hdf5'

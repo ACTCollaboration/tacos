@@ -257,11 +257,58 @@ def fwhm_from_ell_bell(ell, bell):
 
 # copied from soapack.interfaces
 def config_from_yaml_file(filename):
+    """Returns a dictionary from a yaml file given by absolute filename.
+    """
     with open(filename) as f:
         config = yaml.safe_load(f)
     return config
 
 def config_from_yaml_resource(resource):
+    """Returns a dictionary from a yaml file given by the resource name (relative to tacos package).
+    """
     f = pkgutil.get_data('tacos', resource).decode()
     config = yaml.safe_load(f)
     return config
+
+def trim_zeros(ar1, ref=None, rtol=0., atol=0., return_ref=False):
+    """Remove elements from ar1 based on indices corresponding to leading and trailing
+    zeros in ref. 
+
+    Parameters
+    ----------
+    ar1 : array
+        Array to trim
+    ref : array, optional
+        Indices of leading and trailing zeros in ref are removed from ar1, by default ar1.
+    rtol : float, optional
+    atol : float, optional
+    return_ref: bool, optional
+        Return the trimmed reference, by default False.
+
+    Returns
+    -------
+    array
+        Trimmed version of ar1
+
+    Notes
+    -----
+    The definition of "zero" is less than or equal to rtol*ref.max() + atol, by default 0.
+    """
+    if ref is None:
+        ref = ar1
+    ar1 = np.atleast_1d(ar1)
+    ref = np.atleast_1d(ref)
+    assert ar1.ndim == 1 and ref.ndim == 1, 'Currently only supports single-axis operation'
+
+    # get cut value based on rtol and atol
+    cut = rtol*ref.max() + atol
+
+    # apply cut
+    nonzero = np.nonzero(ref > cut)[0]
+    start, stop = nonzero[0], nonzero[-1]
+
+    if return_ref:
+        out = (ar1[start:stop+1], ref[start:stop+1])
+    else:
+        out = ar1[start:stop+1]
+    return out

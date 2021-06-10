@@ -53,6 +53,7 @@ for ar in arrays:
         gauss = hp.gauss_beam(fwhm, lmax=lmax)
         bell = np.append(bell, gauss[lmax_raw+1:])
     else:
+        bell = bell[:lmax+1]
         print(f'Skipping Gaussian extension, lsplice is {lsplice}, lmax is {lmax}')
 
     # add to data structure

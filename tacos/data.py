@@ -18,12 +18,7 @@ from tacos.bandpass import BandPass
 config = utils.config_from_yaml_resource('configs/data_config.yaml')['tacos']
 
 # this is the main file format, which handles all inputs and outputs
-ext_dict = {
-    'map': 'fits',
-    'icovar': 'fits',
-    'bandpass': 'hdf5',
-    'beam': 'hdf5',
-    }
+ext_dict = utils.config_from_yaml_resource('configs/data_config.yaml')['ext_dict']
 
 def data_str(type=None, instr=None, band=None, id=None, set=None, notes=None):
     """Returns a generic data filename, of format '{type}_{instr}_{band}_{id}_{set}{notes}.{ext}'

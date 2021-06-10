@@ -1,33 +1,66 @@
 # hardcoded dictionary of bandpass limit information by instrument band
 f090:
-  int_low: 1
-  int_high: 2
-  fwhm_low: 3
-  fwhm_high: 4
+    trim_zeros: True
+    rtol: 1e-6
+    atol: 0
 
-f150: 1
+f150:
+    trim_zeros: True
+    rtol: 1e-6
+    atol: 0
 
-f220: 2
+f220:
+    trim_zeros: True
+    rtol: 1e-6
+    atol: 0
 
 '100':
-  int_low: 75e9
-  int_high: 150e9
+    trim_zeros: True
+    rtol: 1e-6
+    atol: 0
 
-'143': 2
+'143':
+    trim_zeros: True
+    rtol: 1e-6
+    atol: 0
 
-'217': 5
+'217':
+    trim_zeros: True
+    rtol: 1e-6
+    atol: 0
 
-'353': 6
+'353':
+    trim_zeros: True
+    rtol: 1e-6
+    atol: 0
 
-'353_psb': 7
+'353_psb':
+    trim_zeros: True
+    rtol: 1e-6
+    atol: 0
 
-K: 1
+K:
+    trim_zeros: True
+    rtol: 1e-6
+    atol: 0
 
-Ka: 2
+Ka:
+    trim_zeros: True
+    rtol: 1e-6
+    atol: 0
 
-Q: 3
+Q:
+    trim_zeros: True
+    rtol: 1e-6
+    atol: 0
 
-V: 4
+V:
+    trim_zeros: True
+    rtol: 1e-6
+    atol: 0
 
-W: 5
+W:
+    trim_zeros: True
+    rtol: 1e-6
+    atol: 0
 
