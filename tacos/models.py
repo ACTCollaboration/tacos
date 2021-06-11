@@ -28,22 +28,39 @@ from tacos import constants as cs
 class DiffuseComponent(ABC):
     
     @abstractmethod
-    def compute_amplitude(nu):
-        
+    def __call__(nu):
         pass
 
-    @abstractmethod
-    def compute_interpolation(self):
+    # @abstractmethod
+    # def compute_interpolation(self):
         
-        # Given range of betas, compute interpolation lookup table.
-        # For single beta: 1d table, for two betas 2d table etc.
+    #     # Given range of betas, compute interpolation lookup table.
+    #     # For single beta: 1d table, for two betas 2d table etc.
         
-        raise NotImplementedError()
+    #     raise NotImplementedError()
 
 class Dust(DiffuseComponent):
+
+    # RJ for now
     
-    def __init__(self):
-        pass
+    def __init__(self, nu0, beta, T):
+        self.nu0 = nu0
+        self.beta = beta 
+        self.T = T
+
+    def __call__(self, nu):
+        return modified_blackbody_ratio(nu, self.nu0, self.beta, self.T)
+
+class Synch(DiffuseComponent):
+
+    # RJ for now
+
+    def __init__(self, nu0, beta):
+        self.nu0 = nu0
+        self.beta = beta
+
+    def __call__(self, nu):
+        return power_law_ratio(nu, self.nu0, self.beta)
 
 class NonLinPar(ABC):
     
@@ -52,12 +69,14 @@ class NonLinPar(ABC):
         pass
         
 def power_law_ratio(nu, nu0, beta):
+    beta = np.expand_dims(beta, -1)
     return (nu / nu0) ** beta
 
 def modified_blackbody_ratio(nu, nu0, beta, T):
-    x = nu * cs.hplanck / (cs.kboltz * T)
-    x0 = nu0 * cs.hplanck / (cs.kboltz * T)
-    return power_law_ratio(nu, nu0, beta) * np.expm1(x0) / np.expm1(x)
+    T = np.expand_dims(T, -1)
+    x = nu * cs.hplanck() / (cs.kboltz() * T)
+    x0 = nu0 * cs.hplanck() / (cs.kboltz() * T)
+    return power_law_ratio(nu, nu0, beta + 1) * np.expm1(x0) / np.expm1(x)
 
 def signal(nu, nu0_s, nu0_d, a_s, a_d, beta_s, beta_d, T_d):
     return a_s * power_law_ratio(nu, nu0_s, beta_s) + a_d * modified_blackbody_ratio(nu, nu0_d, beta_d, T_d)

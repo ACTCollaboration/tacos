@@ -1,3 +1,4 @@
+from operator import is_
 import numpy as np
 from scipy.interpolate import interp1d
 import os 
@@ -51,7 +52,7 @@ class BandPass():
     Notes
     -----
     If trim_zeros is True, the definition of "zero" is less than or equal to
-    rtol*ref.max() + atol
+    rtol*bandpass.max() + atol
 
     If rtol or atol are greater than 0, or if a nu_iterator is provided, such that
     the bandpass changes from the raw data in any way, the output bandpass is renormalized
@@ -82,7 +83,7 @@ class BandPass():
                 delta_nu = delta_nu
                 self.nu = np.arange(float(nu_low), float(nu_high), float(delta_nu))
 
-            # get new bandpass
+            # get new bandpass by interpolating against old nu
             bandpass = interp1d(nu, bandpass, kind='linear', bounds_error=False, fill_value=0.0)
             bandpass = bandpass(self.nu)
 
@@ -181,7 +182,7 @@ class BandPass():
                     bandpass += hfile[f'{ar}/bandpass'][()]
             bandpass /= len(band_arrays)
 
-        bandpass_kwargs = config[band]
+        bandpass_kwargs = config['act'][band]
         return cls(bandpass, nu, **bandpass_kwargs)
 
     @classmethod
@@ -234,11 +235,11 @@ class BandPass():
             if nu_sq_corr:
                 bandpass *= nu ** 2
 
-        bandpass_kwargs = config[bandname]
+        bandpass_kwargs = config['planck'][bandname]
         return cls(bandpass, nu, **bandpass_kwargs)
 
     @classmethod
-    def load_wmap_bandpass(cls, filename, band):
+    def load_wmap_bandpass(cls, filename, band, **kwargs):
         '''
         Read WMAP bandpass file and return class instance.
 
@@ -290,10 +291,28 @@ class BandPass():
                         bandpass += hfile[f'{bandname}/bandpass'][()]
             bandpass /= nda * 2
                 
-        bandpass_kwargs = config[band]
+        bandpass_kwargs = config['wmap'][band]
         return cls(bandpass, nu, **bandpass_kwargs)
 
-def get_mixing_matrix(bandpasses, betas, dtype=np.float32):
+    @classmethod
+    def load_pysm_bandpass(cls, filename, instr, band, nu_sq_corr=True, **bandpass_kwargs):
+        if instr == 'act':
+            bandpass_obj = cls.load_act_bandpass(filename, band, **bandpass_kwargs)
+        elif instr == 'planck':
+            bandpass_obj = cls.load_planck_bandpass(filename, band, **bandpass_kwargs)
+        elif instr == 'wmap':
+            bandpass_obj = cls.load_wmap_bandpass(filename, band, **bandpass_kwargs)
+
+        nu = bandpass_obj.nu
+        bandpass = np.ones_like(nu)
+
+        if nu_sq_corr:
+            bandpass *= nu ** 2
+
+        bandpass_kwargs = config['pysm'][band]
+        return cls(bandpass, nu, **bandpass_kwargs)
+
+def get_mixing_matrix(channels, components, dtype=np.float32):
     '''
     Return mixing matrix for given frequency bands and signal
     components.
@@ -309,28 +328,33 @@ def get_mixing_matrix(bandpasses, betas, dtype=np.float32):
     
     Returns
     -------
-    mixing_mat : (nj, ncomp) array or (nj, ncomp, ny, nx) enmap
+    mixing_mat : (nj, ncomp, ...) array or ndmap
         Mixing matrix.
     '''
 
-    raise NotImplementedError
+    nchan = len(channels)
+    ncomp = len(components)
 
-    nj = len(bandpasses)
-    ncomp = betas.shape[0]
-
-    if isinstance(betas, enmap.ndmap):
-        mixing_mat = enmap.zeros((nj,) + betas.shape, wcs=betas.wcs)
+    if hasattr(channels[0].map, 'wcs'):
+        is_enmap = True
+        wcs = channels[0].map.wcs
     else:
-        mixing_mat = np.zeros((nj, ncomp), dtype=dtype)
+        is_enmap = False
 
-    for jidx in range(nj):
+    m_shape = (nchan, ncomp) + channels[0].map.shape
+    m = np.zeros(m_shape, dtype=dtype)
 
-        u_conv = bandpasses[jidx].conv_fact_rj_to_cmb()
-        bandpass = bandpasses[jidx].bandpass
-        nu = bandpass.nu
+    for chanidx, chan in enumerate(channels):
+        for compidx, comp in enumerate(components):
 
-        # NOTE, betas need nu dependence, right?
-        mixing_mat[jidx] = units.integrate_over_bandpass(
-            betas, bandpass, nu)
+            print(m[chanidx, compidx].shape)
 
-    return mixing_mat
+            u_conv = chan.bandpass.rj_to_cmb
+            res = u_conv * chan.bandpass.integrate_signal(comp)
+            print(res.shape)
+            m[chanidx, compidx] = res
+
+    if is_enmap:
+        m = enmap.ndmap(m, wcs)
+    
+    return m
