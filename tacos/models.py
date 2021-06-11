@@ -45,39 +45,34 @@ class Dust(DiffuseComponent):
     
     def __init__(self, nu0, beta, T):
         self.nu0 = nu0
-        self.beta = np.expand_dims(beta , -1)
-        self.T = np.expand_dims(T, -1)
+        beta = np.atleast_1d(beta)
+        T = np.atleast_1d(T)
+        self.beta = np.expand_dims(beta , -1) # frequencies along -1 axis
+        self.T = np.expand_dims(T, -1) # frequencies along -1 axis
 
     def __call__(self, nu):
         return modified_blackbody_ratio(nu, self.nu0, self.beta, self.T)
 
 class Synch(DiffuseComponent):
 
-    # RJ for now
-
     def __init__(self, nu0, beta):
         self.nu0 = nu0
-        self.beta = np.expand_dims(beta, -1)
+        beta = np.atleast_1d(beta)
+        self.beta = np.expand_dims(beta, -1) # frequencies along -1 axis
 
     def __call__(self, nu):
         return power_law_ratio(nu, self.nu0, self.beta)
 
-class NonLinPar(ABC):
-    
-    @abstractmethod
-    def __call__(self, nu):
-        pass
-        
 def power_law_ratio(nu, nu0, beta):
     return (nu / nu0) ** beta
 
 def modified_blackbody_ratio(nu, nu0, beta, T):
     x = nu * cs.hplanck() / (cs.kboltz() * T)
     x0 = nu0 * cs.hplanck() / (cs.kboltz() * T)
-    return power_law_ratio(nu, nu0, beta + 1) * np.expm1(x0) / np.expm1(x)
-
-def signal(nu, nu0_s, nu0_d, a_s, a_d, beta_s, beta_d, T_d):
-    return a_s * power_law_ratio(nu, nu0_s, beta_s) + a_d * modified_blackbody_ratio(nu, nu0_d, beta_d, T_d)
-
-
-
+    return power_law_ratio(nu, nu0, beta + 1) * np.expm1(x0) / np.expm1(x) # RJ for now
+class NonLinPar(ABC):
+    
+    @abstractmethod
+    def __call__(self, nu):
+        pass
+        
