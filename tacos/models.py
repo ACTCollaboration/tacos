@@ -23,6 +23,8 @@
 import numpy as np
 from abc import ABC, abstractmethod
 
+from tacos import constants as cs
+
 class DiffuseComponent(ABC):
     
     @abstractmethod
@@ -47,5 +49,18 @@ class NonLinPar(ABC):
     
     @abstractmethod
     def __call__(self, nu):
+        pass
         
-        
+def power_law_ratio(nu, nu0, beta):
+    return (nu / nu0) ** beta
+
+def modified_blackbody_ratio(nu, nu0, beta, T):
+    x = nu * cs.hplanck / (cs.kboltz * T)
+    x0 = nu0 * cs.hplanck / (cs.kboltz * T)
+    return power_law_ratio(nu, nu0, beta) * np.expm1(x0) / np.expm1(x)
+
+def signal(nu, nu0_s, nu0_d, a_s, a_d, beta_s, beta_d, T_d):
+    return a_s * power_law_ratio(nu, nu0_s, beta_s) + a_d * modified_blackbody_ratio(nu, nu0_d, beta_d, T_d)
+
+
+

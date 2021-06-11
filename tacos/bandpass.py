@@ -20,6 +20,23 @@ class BandPass():
         Bandpass.
     nu : (nfreq) array
         Frequencies in Hz.
+    trim_zeros : bool, optional
+        If True, remove trailing and leading zeros from nu (and corresponding locations 
+        from bandpass) before other operations, by default False.
+    rtol : float, optional
+        See notes, default is 0
+    atol : float, optional
+        See notes, default is 0
+    nu_iterator : str, optional
+        Either "linspace" or "arange"
+    nu_low : float, optional
+        Lower limit of integration, default is nu.min()
+    nu_high : float, optional
+        Upper limit of integration, default is nu.max()
+    N : int, optional
+        If nu_iterator is "linspace," the number of steps, default is 500.
+    delta_nu: float, optional
+        If nu_iterator is "arange," the size of each step, default is 100MHz
 
     Attributes
     ----------
@@ -33,6 +50,9 @@ class BandPass():
 
     Notes
     -----
+    If trim_zeros is True, the definition of "zero" is less than or equal to
+    rtol*ref.max() + atol
+
     If rtol or atol are greater than 0, or if a nu_iterator is provided, such that
     the bandpass changes from the raw data in any way, the output bandpass is renormalized
     such that its integral is still 1 over its domain.
@@ -73,8 +93,8 @@ class BandPass():
         self.bandpass = interp1d(self.nu, bandpass, kind='linear', bounds_error=False, fill_value=0.0)
 
         # Store unit conversion as an attribute
-        self.c_fact_rj_to_cmb = units.convert_rj_to_cmb(
-            self.bandpass, self.nu)
+        self.rj_to_cmb = units.convert_rj_to_cmb(self.bandpass, self.nu)
+        self.cmb_to_rj = units.convert_cmb_to_rj(self.bandpass, self.nu)
 
     def integrate_signal(self, signal, axis=-1):
         '''

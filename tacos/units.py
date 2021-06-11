@@ -38,6 +38,25 @@ def convert_rj_to_cmb(bandpass, nu):
 
     return numerator / denominator
 
+def convert_cmb_to_rj(bandpass, nu):
+    """Return scalar unit conversion factor going from K_CMB to K_RJ taking
+    bandpass integration into account.
+
+    Parameters
+    ----------
+    bandpass : (nfreq) array or callable
+        Bandpass 
+    nu : (nfreq) array
+        Monotonically increasing array of frequencies in Hz.
+
+    Returns
+    -------
+    unit_conv : scalar
+        Unit conversion from K_CMB to K_RJ (brightness or RJ temp)  
+        (thermodynamic temperature).
+    """
+    return 1/convert_rj_to_cmb(bandpass, nu)
+
 def dw_dt(nu, temp=None):
     '''
     Return derivative of w function (defined in Eq. 38 in Jarosik 2003 
