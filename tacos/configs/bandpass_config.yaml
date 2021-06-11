@@ -1,66 +1,159 @@
 # hardcoded dictionary of bandpass limit information by instrument band
-f090:
-    trim_zeros: True
-    rtol: 1e-6
-    atol: 0
+act:
+    f090:
+        trim_zeros: True
+        rtol: 1e-4
+        atol: 0
 
-f150:
-    trim_zeros: True
-    rtol: 1e-6
-    atol: 0
+    f150:
+        trim_zeros: True
+        rtol: 1e-4
+        atol: 0
 
-f220:
-    trim_zeros: True
-    rtol: 1e-6
-    atol: 0
+    f220:
+        trim_zeros: True
+        rtol: 1e-4
+        atol: 0
 
-'100':
-    trim_zeros: True
-    rtol: 1e-6
-    atol: 0
+planck:
+    '100':
+        trim_zeros: True
+        rtol: 1e-4
+        atol: 0
 
-'143':
-    trim_zeros: True
-    rtol: 1e-6
-    atol: 0
+    '143':
+        trim_zeros: True
+        rtol: 1e-4
+        atol: 0
 
-'217':
-    trim_zeros: True
-    rtol: 1e-6
-    atol: 0
+    '217':
+        trim_zeros: True
+        rtol: 1e-4
+        atol: 0
 
-'353':
-    trim_zeros: True
-    rtol: 1e-6
-    atol: 0
+    '353':
+        trim_zeros: True
+        rtol: 1e-4
+        atol: 0
 
-'353_psb':
-    trim_zeros: True
-    rtol: 1e-6
-    atol: 0
+    '353_psb':
+        trim_zeros: True
+        rtol: 1e-4
+        atol: 0
 
-K:
-    trim_zeros: True
-    rtol: 1e-6
-    atol: 0
+wmap:
+    K:
+        trim_zeros: True
+        rtol: 1e-4
+        atol: 0
 
-Ka:
-    trim_zeros: True
-    rtol: 1e-6
-    atol: 0
+    Ka:
+        trim_zeros: True
+        rtol: 1e-4
+        atol: 0
 
-Q:
-    trim_zeros: True
-    rtol: 1e-6
-    atol: 0
+    Q:
+        trim_zeros: True
+        rtol: 1e-4
+        atol: 0
 
-V:
-    trim_zeros: True
-    rtol: 1e-6
-    atol: 0
+    V:
+        trim_zeros: True
+        rtol: 1e-4
+        atol: 0
 
-W:
-    trim_zeros: True
-    rtol: 1e-6
-    atol: 0
+    W:
+        trim_zeros: True
+        rtol: 1e-4
+        atol: 0
 
+pysm:
+    f090:
+        trim_zeros: True
+        rtol: 1e-4
+        atol: 0
+        nu_iterator: linspace
+        N: 5 
+
+    f150:
+        trim_zeros: True
+        rtol: 1e-4
+        atol: 0
+        nu_iterator: linspace
+        N: 5 
+
+    f220:
+        trim_zeros: True
+        rtol: 1e-4
+        atol: 0
+        nu_iterator: linspace
+        N: 5 
+
+    '100':
+        trim_zeros: True
+        rtol: 1e-4
+        atol: 0
+        nu_iterator: linspace
+        N: 5 
+
+    '143':
+        trim_zeros: True
+        rtol: 1e-4
+        atol: 0
+        nu_iterator: linspace
+        N: 5 
+
+    '217':
+        trim_zeros: True
+        rtol: 1e-4
+        atol: 0
+        nu_iterator: linspace
+        N: 5 
+
+    '353':
+        trim_zeros: True
+        rtol: 1e-4
+        atol: 0
+        nu_iterator: linspace
+        N: 5 
+
+    '353_psb':
+        trim_zeros: True
+        rtol: 1e-4
+        atol: 0
+        nu_iterator: linspace
+        N: 5 
+    K:
+        trim_zeros: True
+        rtol: 1e-4
+        atol: 0
+        nu_iterator: linspace
+        N: 5 
+
+    Ka:
+        trim_zeros: True
+        rtol: 1e-4
+        atol: 0
+        nu_iterator: linspace
+        N: 5 
+
+    Q:
+        trim_zeros: True
+        rtol: 1e-4
+        atol: 0
+        nu_iterator: linspace
+        N: 5 
+
+    V:
+        trim_zeros: True
+        rtol: 1e-4
+        atol: 0
+        nu_iterator: linspace
+        N: 5 
+
+    W:
+        trim_zeros: True
+        rtol: 1e-4
+        atol: 0
+        nu_iterator: linspace
+        N: 5 

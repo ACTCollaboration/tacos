@@ -6,6 +6,24 @@ import yaml
 
 import pkgutil
 
+# copied from soapack.interfaces
+def config_from_yaml_file(filename):
+    """Returns a dictionary from a yaml file given by absolute filename.
+    """
+    with open(filename) as f:
+        config = yaml.safe_load(f)
+    return config
+
+def config_from_yaml_resource(resource):
+    """Returns a dictionary from a yaml file given by the resource name (relative to tacos package).
+    """
+    f = pkgutil.get_data('tacos', resource).decode()
+    config = yaml.safe_load(f)
+    return config
+
+config = config_from_yaml_resource('configs/data_config.yaml')['tacos']
+ext_dict = config_from_yaml_resource('configs/data_config.yaml')['ext_dict']
+
 def atleast_nd(arr, n, axis=None):
     """Return a buffer whose new shape has at least n dimensions.
 
@@ -255,21 +273,6 @@ def fwhm_from_ell_bell(ell, bell):
     fwhm = sigma * np.sqrt(8 * np.log(2))
     return fwhm
 
-# copied from soapack.interfaces
-def config_from_yaml_file(filename):
-    """Returns a dictionary from a yaml file given by absolute filename.
-    """
-    with open(filename) as f:
-        config = yaml.safe_load(f)
-    return config
-
-def config_from_yaml_resource(resource):
-    """Returns a dictionary from a yaml file given by the resource name (relative to tacos package).
-    """
-    f = pkgutil.get_data('tacos', resource).decode()
-    config = yaml.safe_load(f)
-    return config
-
 def trim_zeros(ar1, ref=None, rtol=0., atol=0., return_ref=False):
     """Remove elements from ar1 based on indices corresponding to leading and trailing
     zeros in ref. 
@@ -312,3 +315,22 @@ def trim_zeros(ar1, ref=None, rtol=0., atol=0., return_ref=False):
     else:
         out = ar1[start:stop+1]
     return out
+
+def data_fn_str(type=None, instr=None, band=None, id=None, set=None, notes=None):
+    """Returns a generic data filename, of format '{type}_{instr}_{band}_{id}_{set}{notes}.{ext}'
+    """
+    if notes is None:
+        notes = ''
+    data_fn_str_template = '{type}_{instr}_{band}_{id}_{set}{notes}.{ext}'
+    return data_fn_str_template.format(
+        type=type, instr=instr, band=band, id=id, set=set, notes=notes, ext=ext_dict[type]
+        )
+
+def data_dir_str(product, instr):
+    """Returns a generic data directory, of format '{product_dir}/{instr}/'
+    """
+    data_dir_str_template = '{product_dir}/{instr}/'
+    product_dir = config[f'{product}_path']
+    return data_dir_str_template.format(
+        product_dir=product_dir, instr=instr
+    )
