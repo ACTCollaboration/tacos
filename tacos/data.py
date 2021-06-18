@@ -11,6 +11,9 @@ import pkgutil
 
 from soapack import interfaces as sints
 from pixell import enmap
+import healpy as hp
+import camb
+
 from tacos import utils, beam
 from tacos.bandpass import BandPass
 
@@ -33,8 +36,12 @@ class Channel:
         Additional identifier to append to data filenames, by default None
     correlated_noise : bool, optional
         The noise model, by default False
-    pysm: bool, optional
+    pysm : bool, optional
         Whether to load pysm data instead of actual data, by default False
+    healpix : bool, optional
+        Whether to use hp.read_map to load map data, by default False.
+        Only possible if pysm is True. Works by seeking "healpix" as first word
+        in filename notes.
     beam_kwargs : dict, optional
         kwargs to pass to beam.load_<instrument>_beam, by default None
     bandpass_kwargs : dict, optional
@@ -47,7 +54,7 @@ class Channel:
     """
 
     def __init__(self, instr, band, id=None, set=None, notes=None, correlated_noise=False, pysm=False, 
-                    beam_kwargs=None, bandpass_kwargs=None):
+                    healpix=False, cmb=None, noise=None, beam_kwargs=None, bandpass_kwargs=None):
         
         # modify args/kwargs
         if beam_kwargs is None:
@@ -67,6 +74,7 @@ class Channel:
         self._notes = notes
         self._correlated_noise = correlated_noise
         self._pysm = pysm
+        self._healpix = healpix
 
         # store data
         if self.correlated_noise:
@@ -75,16 +83,41 @@ class Channel:
             covmat_type = 'icovar'
 
         # maps and icovars
-        map_path = utils.data_dir_str('maps', instr)
-        map_path += utils.data_fn_str(type='map', instr=instr, band=band, id=id, set=set, notes=notes)
-        self._map = utils.atleast_nd(enmap.read_map(map_path), 4) # (nsplit, npol, ny, nx)
+        if pysm:
+            map_instr = 'pysm'
+            map_id = 'all'
+            map_set = 'all'
+            if healpix:
+                if notes is None:
+                    map_notes = 'healpix'
+                else:
+                    map_notes = 'healpix_' + notes
+            else:
+                map_notes = notes
+        else:
+            map_instr = instr
+            map_id = id
+            map_set = set
+            map_notes = notes
 
-        covmat_path = utils.data_dir_str('covmats', instr)
+        map_path = utils.data_dir_str('map', map_instr)
+        map_path += utils.data_fn_str(type='map', instr=map_instr, band=band, id=map_id, set=map_set, notes=map_notes)
+        
+        if pysm and healpix:
+            self._map = hp.read_map(map_path, field=None, dtype=np.float32)
+        elif not healpix:
+            self._map = utils.atleast_nd(enmap.read_map(map_path), 4) # (nsplit, npol, ny, nx)
+        elif not pysm and healpix:
+            raise NotImplementedError('There are no healpix maps of actual data')
+        else:
+            raise AssertionError("How did we end up here?")
+
+        covmat_path = utils.data_dir_str('covmat', instr)
         covmat_path += utils.data_fn_str(type=covmat_type, instr=instr, band=band, id=id, set=set, notes=notes)
         self._covmat = utils.atleast_nd(enmap.read_map(covmat_path), 5) # (nsplit, npol, npol, ny, nx)
 
         # beams
-        beam_path = utils.data_dir_str('beams', instr)
+        beam_path = utils.data_dir_str('beam', instr)
         beam_path += utils.data_fn_str(type='beam', instr=instr, band='all', id=id, set='all', notes=notes)
         if instr == 'act':
             self._beam = beam.load_act_beam(beam_path, band, **beam_kwargs)
@@ -96,7 +129,7 @@ class Channel:
             pass
 
         # bandpasses
-        bandpass_path = utils.data_dir_str('bandpasses', instr)
+        bandpass_path = utils.data_dir_str('bandpass', instr)
         bandpass_path += utils.data_fn_str(type='bandpass', instr=instr, band='all', id=id, set='all', notes=notes)
         if pysm:
             self._bandpass = BandPass.load_pysm_bandpass(bandpass_path, instr, band, **bandpass_kwargs)
@@ -147,6 +180,10 @@ class Channel:
     @property
     def pysm(self):
         return self._pysm
+
+    @property
+    def healpix(self):
+        return self._healpix
 
     @property
     def map(self):

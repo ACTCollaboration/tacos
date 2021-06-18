@@ -1,10 +1,12 @@
 # helper utility functions
-from pixell import enmap, utils
+from pixell import enmap, enplot, utils
 
 import numpy as np
 import yaml
 
 import pkgutil
+
+### I/O ###
 
 # copied from soapack.interfaces
 def config_from_yaml_file(filename):
@@ -21,8 +23,82 @@ def config_from_yaml_resource(resource):
     config = yaml.safe_load(f)
     return config
 
-config = config_from_yaml_resource('configs/data_config.yaml')['tacos']
-ext_dict = config_from_yaml_resource('configs/data_config.yaml')['ext_dict']
+data_paths = config_from_yaml_resource('configs/data.yaml')['data_paths']
+extensions = config_from_yaml_resource('configs/data.yaml')['extensions']
+
+def data_fn_str(type=None, instr=None, band=None, id=None, set=None, notes=None):
+    """Returns a generic data filename, of format '{type}_{instr}_{band}_{id}_{set}{notes}.{ext}'
+    """
+    if notes is None:
+        notes = ''
+    else:
+        notes = '_' + notes
+    data_fn_str_template = '{type}_{instr}_{band}_{id}_{set}{notes}.{ext}'
+    return data_fn_str_template.format(
+        type=type, instr=instr, band=band, id=id, set=set, notes=notes, ext=extensions[type]
+        )
+
+def data_dir_str(product, instr):
+    """Returns a generic data directory, of format '{product_dir}{instr}/'
+    """
+    data_dir_str_template = '{product_dir}{instr}/'
+    product_dir = data_paths[f'{product}_path']
+    return data_dir_str_template.format(
+        product_dir=product_dir, instr=instr
+    )
+
+def eplot(x, *args, fname=None, show=False, **kwargs): 
+    plots = enplot.plot(x, **kwargs)
+    if fname is not None:
+        enplot.write(fname, plots)
+    if show:
+        enplot.show(plots)
+    return plots
+
+### Arrays Ops ###
+
+def trim_zeros(ar1, ref=None, rtol=0., atol=0., return_ref=False):
+    """Remove elements from ar1 based on indices corresponding to leading and trailing
+    zeros in ref. 
+
+    Parameters
+    ----------
+    ar1 : array
+        Array to trim
+    ref : array, optional
+        Indices of leading and trailing zeros in ref are removed from ar1, by default ar1.
+    rtol : float, optional
+    atol : float, optional
+    return_ref: bool, optional
+        Return the trimmed reference, by default False.
+
+    Returns
+    -------
+    array
+        Trimmed version of ar1
+
+    Notes
+    -----
+    The definition of "zero" is less than or equal to rtol*ref.max() + atol, by default 0.
+    """
+    if ref is None:
+        ref = ar1
+    ar1 = np.atleast_1d(ar1)
+    ref = np.atleast_1d(ref)
+    assert ar1.ndim == 1 and ref.ndim == 1, 'Currently only supports single-axis operation'
+
+    # get cut value based on rtol and atol
+    cut = rtol*ref.max() + atol
+
+    # apply cut
+    nonzero = np.nonzero(ref > cut)[0]
+    start, stop = nonzero[0], nonzero[-1]
+
+    if return_ref:
+        out = (ar1[start:stop+1], ref[start:stop+1])
+    else:
+        out = ar1[start:stop+1]
+    return out
 
 def atleast_nd(arr, n, axis=None):
     """Return a buffer whose new shape has at least n dimensions.
@@ -121,7 +197,9 @@ def symmetrize(arr, axis1=0, axis2=1, method='average'):
     if is_enmap:
         arr =  enmap.ndmap(arr, wcs)
     
-    return arr    
+    return arr 
+
+### Maps ###   
 
 def get_coadd_map(imap, ivar, axis=-4):
     """Returns the ivar-weighted coadd of the the imaps. The coaddition
@@ -252,6 +330,8 @@ def eigpow(A, e, axes=[-2, -1], rlim=None, alim=None):
 
     return O
 
+### Harmonic/Fourier ###
+
 def lmax_from_wcs(wcs, method='zach'):
     """Get lmax from wcs, either "k-space" or "CAR" lmax (by method "zach" or "adri" respectively).
     """
@@ -272,65 +352,3 @@ def fwhm_from_ell_bell(ell, bell):
     sigma = np.sqrt(-2 * np.log(bell) / (ell*(ell+1)))
     fwhm = sigma * np.sqrt(8 * np.log(2))
     return fwhm
-
-def trim_zeros(ar1, ref=None, rtol=0., atol=0., return_ref=False):
-    """Remove elements from ar1 based on indices corresponding to leading and trailing
-    zeros in ref. 
-
-    Parameters
-    ----------
-    ar1 : array
-        Array to trim
-    ref : array, optional
-        Indices of leading and trailing zeros in ref are removed from ar1, by default ar1.
-    rtol : float, optional
-    atol : float, optional
-    return_ref: bool, optional
-        Return the trimmed reference, by default False.
-
-    Returns
-    -------
-    array
-        Trimmed version of ar1
-
-    Notes
-    -----
-    The definition of "zero" is less than or equal to rtol*ref.max() + atol, by default 0.
-    """
-    if ref is None:
-        ref = ar1
-    ar1 = np.atleast_1d(ar1)
-    ref = np.atleast_1d(ref)
-    assert ar1.ndim == 1 and ref.ndim == 1, 'Currently only supports single-axis operation'
-
-    # get cut value based on rtol and atol
-    cut = rtol*ref.max() + atol
-
-    # apply cut
-    nonzero = np.nonzero(ref > cut)[0]
-    start, stop = nonzero[0], nonzero[-1]
-
-    if return_ref:
-        out = (ar1[start:stop+1], ref[start:stop+1])
-    else:
-        out = ar1[start:stop+1]
-    return out
-
-def data_fn_str(type=None, instr=None, band=None, id=None, set=None, notes=None):
-    """Returns a generic data filename, of format '{type}_{instr}_{band}_{id}_{set}{notes}.{ext}'
-    """
-    if notes is None:
-        notes = ''
-    data_fn_str_template = '{type}_{instr}_{band}_{id}_{set}{notes}.{ext}'
-    return data_fn_str_template.format(
-        type=type, instr=instr, band=band, id=id, set=set, notes=notes, ext=ext_dict[type]
-        )
-
-def data_dir_str(product, instr):
-    """Returns a generic data directory, of format '{product_dir}/{instr}/'
-    """
-    data_dir_str_template = '{product_dir}/{instr}/'
-    product_dir = config[f'{product}_path']
-    return data_dir_str_template.format(
-        product_dir=product_dir, instr=instr
-    )

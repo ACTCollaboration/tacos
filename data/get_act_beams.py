@@ -21,15 +21,16 @@ parser = argparse.ArgumentParser('Take raw act beams and reduce/rename them for 
 args = parser.parse_args()
 
 # get some basics
-rawpath = data.config['raw_path'] + 'act/beams/'
-beampath = data.config['beams_path'] + 'act/'
+config = utils.config_from_yaml_resource('configs/data.yaml')
+rawpath = utils.data_dir_str('raw', 'act') + 'beams/'
+beampath = utils.data_dir_str('beam', 'act')
 
 # define what we are looping over
 arrays = ['pa4_f150','pa4_f220', 'pa5_f090', 'pa5_f150', 'pa6_f090', 'pa6_f150']
 beams = {}
 
 # get act geometry
-_, wcs = enmap.read_map_geometry(data.config['raw_path'] + 'act/map_pa4_f150_night_set0.fits')
+_, wcs = enmap.read_map_geometry(utils.data_dir_str('raw', 'act') + 'map_pa4_f150_night_set0.fits')
 lmax = utils.lmax_from_wcs(wcs)
 
 # for each freq, load raw beam and truncate at lmax
@@ -56,13 +57,16 @@ for ar in arrays:
         bell = bell[:lmax+1]
         print(f'Skipping Gaussian extension, lsplice is {lsplice}, lmax is {lmax}')
 
+    # save T beam as E, B beams
+    bell = np.repeat(utils.atleast_nd(bell, 2), 3, axis=0)
+
     # add to data structure
     beams[ar] = {}
     beams[ar]['ell'] = np.arange(lmax + 1)
     beams[ar]['bell'] = bell
 
 # save beams to disk
-obeam_fn = data.data_str(type='beam', instr='act', band='all', id='all', set='all')
+obeam_fn = utils.data_fn_str(type='beam', instr='act', band='all', id='all', set='all')
 
 with h5py.File(beampath + obeam_fn, 'w') as hfile:
 

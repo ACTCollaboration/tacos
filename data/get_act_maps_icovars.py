@@ -22,14 +22,14 @@ parser.add_argument('--raw-is-iau', dest='raw_is_iau', default=False, action='st
 args = parser.parse_args()
 
 # get some basics
-rawpath = data.config['raw_path'] + 'act/'
-mappath = data.config['maps_path'] + 'act/'
-covmatpath = data.config['covmats_path'] + 'act/'
+rawpath = utils.data_dir_str('raw', 'act')
+mappath = utils.data_dir_str('map', 'act')
+covmatpath = utils.data_dir_str('covmat', 'act')
 
 # define the map/ivar name assignments
 mapsets = dict(
-map_f90_set0_fns = ['map_pa5_f090_night_set0.fits', 'map_pa6_f090_night_set0.fits'],
-map_f90_set1_fns = ['map_pa5_f090_night_set1.fits', 'map_pa6_f090_night_set1.fits'],
+map_f090_set0_fns = ['map_pa5_f090_night_set0.fits', 'map_pa6_f090_night_set0.fits'],
+map_f090_set1_fns = ['map_pa5_f090_night_set1.fits', 'map_pa6_f090_night_set1.fits'],
 map_f150_set0_fns = ['map_pa4_f150_night_set0.fits', 'map_pa5_f150_night_set0.fits', 'map_pa6_f150_night_set0.fits'],
 map_f150_set1_fns = ['map_pa4_f150_night_set1.fits', 'map_pa5_f150_night_set1.fits', 'map_pa6_f150_night_set1.fits'],
 map_f220_set0_fns = ['map_pa4_f220_night_set0.fits'],
@@ -37,7 +37,7 @@ map_f220_set1_fns = ['map_pa4_f220_night_set1.fits'],
 )
 
 mapsets.update(dict(
-    map_f90_coadd_fns = mapsets['map_f090_set0_fns'] + mapsets['map_f090_set1_fns'],
+    map_f090_coadd_fns = mapsets['map_f090_set0_fns'] + mapsets['map_f090_set1_fns'],
     map_f150_coadd_fns = mapsets['map_f150_set0_fns'] + mapsets['map_f150_set1_fns'],
     map_f220_coadd_fns = mapsets['map_f220_set0_fns'] + mapsets['map_f220_set1_fns'],
 ))
@@ -130,8 +130,8 @@ for freq in freqs:
         # save
         extra = {'POLCCONV': 'IAU'}
 
-        omap_fn = data.data_str(type='map', instr='act', band=freq, id='all', set=split)
+        omap_fn = utils.data_fn_str(type='map', instr='act', band=freq, id='all', set=split)
         enmap.write_map(mappath + omap_fn, map_coadd, extra=extra)
 
-        ocoadd_fn = data.data_str(type='icovar', instr='act', band=freq, id='all', set=split)
+        ocoadd_fn = utils.data_fn_str(type='icovar', instr='act', band=freq, id='all', set=split)
         enmap.write_map(covmatpath + ocoadd_fn, icovar_coadd, extra=extra)

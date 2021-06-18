@@ -10,6 +10,7 @@ Bayesian map-based component separation for ACT
 - [enlib](https://github.com/amaurea/enlib)
 - [optweight](https://github.com/AdriJD/optweight)
 - [yaml](https://pyyaml.org/wiki/PyYAMLDocumentation)
+- [camb](https://camb.readthedocs.io/en/latest/)
 
 
 ### Installation

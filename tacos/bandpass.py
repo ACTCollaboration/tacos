@@ -1,14 +1,13 @@
-from operator import is_
 import numpy as np
 from scipy.interpolate import interp1d
-import os 
+import os  
 
 from pixell import enmap
 import h5py
 
 from tacos import units, utils
 
-config = utils.config_from_yaml_resource('configs/bandpass_config.yaml')
+config = utils.config_from_yaml_resource('configs/bandpass.yaml')
 
 class BandPass():
     '''
@@ -77,10 +76,8 @@ class BandPass():
 
             # get new nu
             if nu_iterator == 'linspace':
-                N = N
                 self.nu = np.linspace(float(nu_low), float(nu_high), int(N))
             elif nu_iterator == 'arange':
-                delta_nu = delta_nu
                 self.nu = np.arange(float(nu_low), float(nu_high), float(delta_nu))
 
             # get new bandpass by interpolating against old nu
@@ -114,7 +111,7 @@ class BandPass():
             Integrated signal.
         '''
 
-        # Convert callables to arrays, if necessary
+        # Convert callables to arrays
         bandpass = self.bandpass(self.nu)
         
         if callable(signal):
@@ -125,7 +122,6 @@ class BandPass():
         bc_shape = np.ones(signal.ndim, dtype=int)
         bc_shape[axis] = bandpass.size
         bandpass = bandpass.reshape(tuple(bc_shape))
-
         return np.trapz(signal * bandpass, x=self.nu, axis=axis)
 
     @classmethod
@@ -152,6 +148,11 @@ class BandPass():
         ValueError
             If array is not recognized.        
         '''
+        # assert the instrument and filename match
+        head, tail = os.path.split(filename)
+        assert head.split('/')[-1] == 'act'
+        assert tail.split('_')[1] == 'act'
+
         bands = ['f090', 'f150', 'f220']
         arrays = ['pa4_f150', 'pa4_f220', 'pa5_f090', 'pa5_f150', 'pa6_f090', 'pa6_f150']
         
@@ -205,7 +206,7 @@ class BandPass():
 
         Returns
         -------
-        hfi_bandpass : bandpass.BandPass instance
+        planck_bandpass : bandpass.BandPass instance
             Bandpass instance for requested HFI band.
 
         Raises
@@ -213,6 +214,10 @@ class BandPass():
         ValueError
             If band is not recognized.        
         '''
+        # assert the instrument and filename match
+        head, tail = os.path.split(filename)
+        assert head.split('/')[-1] == 'planck'
+        assert tail.split('_')[1] == 'planck'
 
         bands = ['100', '143', '217', '353', '545', '857']
         if band not in bands:
@@ -260,6 +265,10 @@ class BandPass():
         ValueError
             If band is not recognized.        
         '''
+        # assert the instrument and filename match
+        head, tail = os.path.split(filename)
+        assert head.split('/')[-1] == 'wmap'
+        assert tail.split('_')[1] == 'wmap'
 
         bands = ['K', 'Ka', 'Q', 'V', 'W']
         if band not in bands:
@@ -296,6 +305,30 @@ class BandPass():
 
     @classmethod
     def load_pysm_bandpass(cls, filename, instr, band, nu_sq_corr=True, **bandpass_kwargs):
+        """Read bandpass file corresponding to provided instrument and generate a pysm-tophat
+        band over the same frequency range.
+
+        Parameters
+        ----------
+        filename : str
+            Absolute path to file.
+        instr : str
+            One of "act", "planck", or "wmap". Must match filename.
+        band : str
+            Band belonging to one of the instruments.
+        nu_sq_corr : bool, optional
+            Preprocess bandpasses by applying nu ** 2 correction factor., by default True
+
+        Returns
+        -------
+        pysm_bandpass : bandpass.BandPass instance
+            Bandpass instance giving a tophat over frequency of requested instrument, band.
+        """
+        # assert the instrument and filename match
+        head, tail = os.path.split(filename)
+        assert head.split('/')[-1] == instr
+        assert tail.split('_')[1] == instr
+
         if instr == 'act':
             bandpass_obj = cls.load_act_bandpass(filename, band, **bandpass_kwargs)
         elif instr == 'planck':
@@ -311,50 +344,3 @@ class BandPass():
 
         bandpass_kwargs = config['pysm'][band]
         return cls(bandpass, nu, **bandpass_kwargs)
-
-def get_mixing_matrix(channels, components, dtype=np.float32):
-    '''
-    Return mixing matrix for given frequency bands and signal
-    components.
-
-    Parameters
-    ----------
-    bandpasses : (nj) array-like of BandPass objects
-        Bandpass for each frequency band.
-    betas : (ncomp) array or (ncomp, ny, nx) enmap.
-        Spectral indices per components.
-    dtype : type
-        Dtype for output.
-    
-    Returns
-    -------
-    mixing_mat : (nj, ncomp, ...) array or ndmap
-        Mixing matrix.
-    '''
-
-    nchan = len(channels)
-    ncomp = len(components)
-
-    if hasattr(channels[0].map, 'wcs'):
-        is_enmap = True
-        wcs = channels[0].map.wcs
-    else:
-        is_enmap = False
-
-    m_shape = (nchan, ncomp) + channels[0].map.shape
-    m = np.zeros(m_shape, dtype=dtype)
-
-    for chanidx, chan in enumerate(channels):
-        for compidx, comp in enumerate(components):
-
-            print(m[chanidx, compidx].shape)
-
-            u_conv = chan.bandpass.rj_to_cmb
-            res = u_conv * chan.bandpass.integrate_signal(comp)
-            print(res.shape)
-            m[chanidx, compidx] = res
-
-    if is_enmap:
-        m = enmap.ndmap(m, wcs)
-    
-    return m

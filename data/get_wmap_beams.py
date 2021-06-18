@@ -21,15 +21,16 @@ parser = argparse.ArgumentParser('Take raw wmap beams and reduce/rename them for
 args = parser.parse_args()
 
 # get some basics
-rawpath = data.config['raw_path'] + 'wmap/beams/'
-beampath = data.config['beams_path'] + 'wmap/'
+config = utils.config_from_yaml_resource('configs/data.yaml')
+rawpath = utils.data_dir_str('raw', 'wmap') + 'beams/'
+beampath = utils.data_dir_str('beam', 'wmap')
 
 # define what we are looping over
 freqs = ['K', 'Ka', 'Q', 'V', 'W']
 beams = {}
 
 # get act geometry
-_, wcs = enmap.read_map_geometry(data.config['raw_path'] + 'act/map_pa4_f150_night_set0.fits')
+_, wcs = enmap.read_map_geometry(utils.data_dir_str('raw', 'act') + 'map_pa4_f150_night_set0.fits')
 lmax = utils.lmax_from_wcs(wcs)
 
 # for each freq, load raw beam and extend to lmax with a Gaussian
@@ -55,6 +56,9 @@ for freq in freqs:
         gauss = hp.gauss_beam(fwhm, lmax=lmax)
         bell = np.append(bell, gauss[lmax_raw+1:])
 
+        # save T beam as E, B beams
+        bell = np.repeat(utils.atleast_nd(bell, 2), 3, axis=0)
+
         # add to data structure
         key = freq + str(da)
         beams[key] = {}
@@ -62,7 +66,7 @@ for freq in freqs:
         beams[key]['bell'] = bell
 
 # save beams to disk
-obeam_fn = data.data_str(type='beam', instr='wmap', band='all', id='all', set='all')
+obeam_fn = utils.data_fn_str(type='beam', instr='wmap', band='all', id='all', set='all')
 
 with h5py.File(beampath + obeam_fn, 'w') as hfile:
 

@@ -22,9 +22,9 @@ parser.add_argument('--odtype', dest='odtype', type=str, default='f4', help='Num
 args = parser.parse_args()
 
 # get some basics
-rawpath = data.config['raw_path'] + 'wmap/'
-mappath = data.config['maps_path'] + 'wmap/'
-covmatpath = data.config['covmats_path'] + 'wmap/'
+rawpath = utils.data_dir_str('raw', 'wmap')
+mappath = utils.data_dir_str('map', 'wmap')
+covmatpath = utils.data_dir_str('covmat', 'wmap')
 
 # define the map/ivar name assignments
 mapsets = dict(
@@ -59,7 +59,7 @@ else:
 print(f'Writing to dtype={args.odtype}')
 
 # get act geometry
-shape, wcs = enmap.read_map_geometry(data.config['raw_path'] + 'act/map_pa4_f150_night_set0.fits')
+shape, wcs = enmap.read_map_geometry(utils.data_dir_str('raw', 'act') + 'map_pa4_f150_night_set0.fits')
 shape = shape[-2:]
 
 # for each combo, grab maps and ivars and get coadd
@@ -145,8 +145,8 @@ for freq in freqs:
         # save
         extra = {'POLCCONV': 'IAU'}
 
-        omap_fn = data.data_str(type='map', instr='wmap', band=freq, id='all', set=split)
+        omap_fn = utils.data_fn_str(type='map', instr='wmap', band=freq, id='all', set=split)
         enmap.write_map(mappath + omap_fn, map_coadd.astype(args.odtype), extra=extra)
 
-        ocoadd_fn = data.data_str(type='icovar', instr='wmap', band=freq, id='all', set=split)
+        ocoadd_fn = utils.data_fn_str(type='icovar', instr='wmap', band=freq, id='all', set=split)
         enmap.write_map(covmatpath + ocoadd_fn, icovar_coadd.astype(args.odtype), extra=extra)

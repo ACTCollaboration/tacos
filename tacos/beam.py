@@ -67,7 +67,7 @@ def load_act_beam(filename, band, array=None):
         bell_interp = interp1d(ell, bell, kind='cubic')
         bell = bell_interp(np.arange(lmax+1)) # up to and including lmax
 
-        return bell / np.max(bell)
+        return bell / np.max(bell, axis=-1, keepdims=True)
 
 def load_planck_beam(filename, band, psb_only=True):
     """Read Planck HFI beam file and return b(ell) array. If beam file
@@ -118,7 +118,7 @@ def load_planck_beam(filename, band, psb_only=True):
         bell_interp = interp1d(ell, bell, kind='cubic')
         bell = bell_interp(np.arange(lmax+1)) # up to and including lmax
 
-        return bell / np.max(bell)
+        return bell / np.max(bell, axis=-1, keepdims=True)
 
 def load_wmap_beam(filename, band):
     """Read WMAP beam file and return b(ell) array. If beam file
@@ -175,5 +175,5 @@ def load_wmap_beam(filename, band):
         bell_interp = interp1d(ell, bell, kind='cubic')
         bell = bell_interp(np.arange(lmax+1)) # up to and including lmax
 
-        return bell / np.max(bell)
+        return bell / np.max(bell, axis=-1, keepdims=True)
 
