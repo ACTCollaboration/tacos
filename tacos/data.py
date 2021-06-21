@@ -12,7 +12,6 @@ import pkgutil
 from soapack import interfaces as sints
 from pixell import enmap
 import healpy as hp
-import camb
 
 from tacos import utils, beam
 from tacos.bandpass import BandPass
@@ -54,7 +53,7 @@ class Channel:
     """
 
     def __init__(self, instr, band, id=None, set=None, notes=None, correlated_noise=False, pysm=False, 
-                    healpix=False, cmb=None, noise=None, beam_kwargs=None, bandpass_kwargs=None):
+                    healpix=False, cmb=False, noise=False, beam_kwargs=None, bandpass_kwargs=None):
         
         # modify args/kwargs
         if beam_kwargs is None:
@@ -78,7 +77,7 @@ class Channel:
 
         # store data
         if self.correlated_noise:
-            pass
+            raise NotImplementedError('Correlated noise not yet implemented')
         else:
             covmat_type = 'icovar'
 
@@ -104,7 +103,7 @@ class Channel:
         map_path += utils.data_fn_str(type='map', instr=map_instr, band=band, id=map_id, set=map_set, notes=map_notes)
         
         if pysm and healpix:
-            self._map = hp.read_map(map_path, field=None, dtype=np.float32)
+            self._map = utils.atleast_nd(hp.read_map(map_path, field=None, dtype=np.float32), 3) # (nsplit, npol, npix)
         elif not healpix:
             self._map = utils.atleast_nd(enmap.read_map(map_path), 4) # (nsplit, npol, ny, nx)
         elif not pysm and healpix:
@@ -144,6 +143,18 @@ class Channel:
                 pass
             else:
                 raise ValueError(f'{instr} must be one of "act", "planck", "wmap"')
+
+        # add realizations as necessary
+        if cmb is not False:
+            assert pysm, 'Can only add CMB realization to a simulated map'
+            self._map += utils.get_cmb_sim(self._map.shape, self._map.wcs, dtype=self._map.dtype, seed=cmb)
+
+        if noise is not False:
+            assert pysm, 'Can only add a noise realization to a simulated map'
+            if covmat_type == 'icovar':
+                self._map += utils.get_icovar_noise_sim(icovar=self.covmat, seed=noise)
+            else:
+                raise NotImplementedError('Correlated noise not yet implemented')
 
     def convolve_to_beam(self, bell):
         pass

@@ -1,5 +1,6 @@
 # helper utility functions
-from pixell import enmap, enplot, utils
+from pixell import enmap, enplot, curvedsky, utils
+import camb
 
 import numpy as np
 import yaml
@@ -47,13 +48,54 @@ def data_dir_str(product, instr):
         product_dir=product_dir, instr=instr
     )
 
-def eplot(x, *args, fname=None, show=False, **kwargs): 
+def eplot(x, *args, fname=None, show=False, **kwargs):
+    """Return a list of enplot plots. Optionally, save and display them.
+
+    Parameters
+    ----------
+    x : ndmap
+        Items to plot
+    fname : str or path-like, optional
+        Full path to save the plots, by default None. If None, plots are
+        not saved.
+    show : bool, optional
+        Whether to display plots, by default False
+    **kwargs : dict
+        Optional arguments to pass to enplot.plot
+
+    Returns
+    -------
+    list
+        A list of enplot plot objects.
+    """
     plots = enplot.plot(x, **kwargs)
     if fname is not None:
         enplot.write(fname, plots)
     if show:
         enplot.show(plots)
     return plots
+
+def eshow(x, *args, fname=None, return_plots=False, **kwargs):
+    """Show enplot plots of ndmaps. Optionally, save and return them.
+
+    Parameters
+    ----------
+    x : ndmap
+        Items to plot
+    fname : str or path-like, optional
+        Full path to save the plots, by default None. If None, plots are
+        not saved.
+    return_plots : bool, optional
+        Whether to return plots, by default False
+
+    Returns
+    -------
+    list or None
+        A list of enplot plot objects, only if return_plots is True.
+    """
+    res = eplot(x, *args, fname=fname, show=True, **kwargs)
+    if return_plots:
+        return res
 
 ### Arrays Ops ###
 
@@ -150,11 +192,11 @@ def symmetrize(arr, axis1=0, axis2=1, method='average'):
     Notes
     -----
     If the method is 'average,' the returned array is (a + a.T)/2, which
-    is the simple average of the off diagonals.
+    is the simple average of the off-diagonals.
 
     If the method is 'from_triu,' the returned array is (a + a.T - diag(a)),
-    which first sets the lower triangle to 0, and then replaces it with
-    the upper triangle.
+    where a has its lower triangle first set to 0, and then replaced with
+    its upper triangle.
     """
     # store wcs if imap is ndmap
     if hasattr(arr, 'wcs'):
@@ -198,6 +240,38 @@ def symmetrize(arr, axis1=0, axis2=1, method='average'):
         arr =  enmap.ndmap(arr, wcs)
     
     return arr 
+
+def eigpow(A, e, axes=[-2, -1], rlim=None, alim=None):
+    """A hack around pixell.utils.eigpow which upgrades the data
+    precision to at least double precision if necessary prior to
+    operation.
+    """
+    # store wcs if imap is ndmap
+    if hasattr(A, 'wcs'):
+        is_enmap = True
+        wcs = A.wcs
+    else:
+        is_enmap = False
+
+    dtype = A.dtype
+    
+    # cast to double precision if necessary
+    if np.dtype(dtype).itemsize < 8:
+        A = np.asanyarray(A, dtype=np.float64)
+        recast = True
+    else:
+        recast = False
+
+    O = utils.eigpow(A, e, axes=axes, rlim=rlim, alim=alim)
+
+    # cast back to input precision if necessary
+    if recast:
+        O = np.asanyarray(O, dtype=dtype)
+
+    if is_enmap:
+        O =  enmap.ndmap(O, wcs)
+
+    return O
 
 ### Maps ###   
 
@@ -274,8 +348,10 @@ def get_coadd_map_icovar(imap, icovar, imap_split_axis=-4, imap_icovar_axis=-3, 
     else:
         is_enmap = False
 
+    # sensibility check
+    assert icovar_axis2 > icovar_axis1, 'axis2 must be greater than axis1'
+
     # first move the axes into a standard position
-    ndim = imap.ndim
     imap = atleast_nd(imap, 4)
     imap = np.moveaxis(imap, (imap_split_axis, imap_icovar_axis), (-4, -3))
 
@@ -298,37 +374,107 @@ def get_coadd_map_icovar(imap, icovar, imap_split_axis=-4, imap_icovar_axis=-3, 
 
     return omap
 
-def eigpow(A, e, axes=[-2, -1], rlim=None, alim=None):
-    """A hack around pixell.utils.eigpow which upgrades the data
-    precision to at least double precision if necessary prior to
-    operation.
+def get_icovar_noise_sim(icovar, icovar_axis1=-4, icovar_axis2=-3, seed=None):
+    """Given a pixel-space inverse covariance matrix, draw a noise simulation
+    directly from it.
+
+    Parameters
+    ----------
+    icovar : ndmap or array
+        The inverse-covariance matrix to draw from
+    icovar_axis1 : int, optional
+        The axis in imaps corresponding to the first covaried component, by default -4
+    icovar_axis2 : int, optional
+        The axis in imaps corresponding to the second covaried component, by default -3
+    seed : int or tuple of ints, optional
+        The seed of the random draw, by default None
+
+    Returns
+    -------
+    ndmap or array
+        A simulation drawn from the covariance matrix corresponding to icovar.
+
+    Notes
+    -----
+    If icovar has shape (*s1,N1,*s2,N2,...,ny,nx) where N1 and N2 are the covaried
+    components (must be equal) and ny, nx are the map dimensions, the sample will
+    have shape (*(s1+s2),N2,...,ny,nx).
+
+    The covariance matrix must be the inverse of icovar, by definition. This function
+    uses eigpow internally, which performs an SVD on icovar, with eigenvalues raised 
+    to the -0.5 power, applied to standard-normal draws in the right shape.
     """
     # store wcs if imap is ndmap
-    if hasattr(A, 'wcs'):
+    if hasattr(icovar, 'wcs'):
         is_enmap = True
-        wcs = A.wcs
+        wcs = icovar.wcs
     else:
         is_enmap = False
 
-    dtype = A.dtype
+    # sensibility check
+    assert icovar_axis2 > icovar_axis1, 'axis2 must be greater than axis1'
+
+    np.random.seed(seed)
     
-    # cast to double precision if necessary
-    if np.dtype(dtype).itemsize < 8:
-        A = np.asanyarray(A, dtype=np.float64)
-        recast = True
-    else:
-        recast = False
+    # move axes into a standard position, then
+    # shape of sample will be same as icovar, except "removing" the "first icovar axis" i.e. -4
+    icovar = np.moveaxis(icovar, (icovar_axis1, icovar_axis2), (-4, -3))
+    oshape = icovar.shape[:-4] + icovar.shape[-3:]
 
-    O = utils.eigpow(A, e, axes=axes, rlim=rlim, alim=alim)
-
-    # cast back to input precision if necessary
-    if recast:
-        O = np.asanyarray(O, dtype=dtype)
+    # we want covar**0.5, which is icovar**-0.5, then
+    # draw a map-space sample into the right shape
+    # finally, move axes back if necessary
+    icovar = eigpow(icovar, -0.5, axes=(icovar_axis1, icovar_axis2))
+    x = np.random.randn(*oshape).astype(icovar.dtype)
+    res = np.einsum('...ijyx,...jyx->...iyx', icovar, x)
+    res = np.moveaxis(res, -3, icovar_axis2)
 
     if is_enmap:
-        O =  enmap.ndmap(O, wcs)
+        res = enmap.ndmap(res, wcs)
+    return res
 
-    return O
+def get_cmb_sim(shape, wcs, H0=67.9, lmax=6_000, dtype=np.float32, seed=None):
+    """Get a realization of the CMB, using CAMB default parameters up to the 
+    specified H0 and lmax. Units are in uK_CMB. 
+
+    Parameters
+    ----------
+    shape : tuple
+        Output shape of map. Will be promoted to length-3 if length-2, and truncated
+        to length-3 if longer than length-3.
+    wcs : wcs
+    H0 : float, optional
+    lmax : int, optional
+        Bandlimit of realization, by default 6_000
+    dtype : dtype, optional
+        Data type of map, by default np.float32
+    seed : int or tuple of int, optional
+        Seed for realization, by default None
+
+    Returns
+    -------
+    ndmap
+        Map of the realization, of shape (ncomp, ny,nx)
+    """
+    shape = atleast_nd(np.zeros(shape), 3).shape[-3:]
+
+    # get power spectra
+    params = camb.model.CAMBparams()
+    params.set_cosmology(H0=H0)
+    params.set_for_lmax(lmax)
+    res = camb.get_results(params)
+    spectra = res.get_cmb_power_spectra(lmax=lmax, spectra=('total',), CMB_unit='muK', raw_cl=True)['total']
+
+    # modify the shape of spectra (lmax+1,4) to (3,3,lmax+1)
+    TT, EE, BB, TE = spectra.T
+    spectra = np.array([
+        [TT, TE, np.zeros_like(TT)],
+        [TE, EE, np.zeros_like(TT)],
+        [np.zeros_like(TT), np.zeros_like(TT), BB]
+    ])
+
+    # get rand map
+    return curvedsky.rand_map(shape, wcs, spectra, lmax=lmax, dtype=dtype, seed=seed)
 
 ### Harmonic/Fourier ###
 
