@@ -1,0 +1,20 @@
+parameters:
+    shape: '/path/to/enmap/geometry' # (480, 960)
+    wcs: '/path/to/enmap/geometry'
+    # dtype: 'f4'
+
+components:
+    Dust:
+        beta:
+            value: 1.6
+            # shape: (1, 60, 160)
+            # simple_upgrade: 
+            #   factor: 8
+        T:
+            value: 19.6
+    Synch:
+        beta:
+            value: -3.1
+    CMB:
+        None
+        

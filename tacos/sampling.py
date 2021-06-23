@@ -40,12 +40,12 @@ def get_mixing_matrix(channels, components, dtype=np.float32):
     m = np.zeros(m_shape, dtype=dtype)
 
     for chanidx, chan in enumerate(channels):
+        u_conv = chan.bandpass.rj_to_cmb
         for compidx, comp in enumerate(components):
-            u_conv = chan.bandpass.rj_to_cmb
             res = u_conv * chan.bandpass.integrate_signal(comp)
             m[chanidx, compidx] = res
 
     if is_enmap:
         m = enmap.ndmap(m, wcs)
-    
+
     return m

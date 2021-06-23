@@ -1,0 +1,17 @@
+templates:
+    beta_dust: '/path/to/beta_dust'
+    T_dust: '/path/to/T_dust'
+    beta_synch: '/path/to/beta_synch'
+
+interp_bounds:
+    Dust:
+        beta: 
+            low: -3.5
+            high: 6.5
+        T:
+            low: 5
+            high: 45
+    Synch:
+        beta:
+            low: -8
+            high: 2

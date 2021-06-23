@@ -169,6 +169,12 @@ def atleast_nd(arr, n, axis=None):
         oaxis = tuple(range(n - arr.ndim - len(axis))) + tuple(axis) # prepend the extra dims
     return np.expand_dims(arr, oaxis)
 
+def expand_all_arg_dims(*args):
+    return (np.atleast_1d(a)[..., None] for a in args)
+
+def expand_all_kwarg_dims(**kwargs):
+    return (np.atleast_1d(v)[..., None] for v in kwargs.values())
+
 def symmetrize(arr, axis1=0, axis2=1, method='average'):
     """Symmetrizes the input array along the specified axes.
 

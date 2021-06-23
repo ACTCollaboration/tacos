@@ -41,6 +41,14 @@ class Channel:
         Whether to use hp.read_map to load map data, by default False.
         Only possible if pysm is True. Works by seeking "healpix" as first word
         in filename notes.
+    cmb : bool, None, int, or tuple-of-int
+        Whether to add a CMB realization to the map. False will pass; None, int, or
+        tuple-of-int will be set as the seed of the realization. True will set cmb to
+        None. Raises exception if pysm is False.
+    noise : bool, None, int, or tuple-of-int
+        Whether to add a noise realization to the map. False will pass; None, int, or
+        tuple-of-int will be set as the seed of the realization. True will set cmb to
+        None. Raises exception if pysm is False.
     beam_kwargs : dict, optional
         kwargs to pass to beam.load_<instrument>_beam, by default None
     bandpass_kwargs : dict, optional
@@ -62,24 +70,23 @@ class Channel:
             bandpass_kwargs = {}
 
         # store metadata
-        self._instr = instr
-        self._band = band
+        self.instr = instr
+        self.band = band
         if id is None:
             id = 'all'
-        self._id = id
+        self.id = id
         if set is None:
             set = 'coadd'
-        self._set = set
-        self._notes = notes
-        self._correlated_noise = correlated_noise
-        self._pysm = pysm
-        self._healpix = healpix
+        self.set = set
+        self.notes = notes
+        self.correlated_noise = correlated_noise
+        self.pysm = pysm
+        self.healpix = healpix
 
-        # store data
         if self.correlated_noise:
             raise NotImplementedError('Correlated noise not yet implemented')
         else:
-            covmat_type = 'icovar'
+            self.covmat_type = 'icovar'
 
         # maps and icovars
         if pysm:
@@ -112,7 +119,7 @@ class Channel:
             raise AssertionError("How did we end up here?")
 
         covmat_path = utils.data_dir_str('covmat', instr)
-        covmat_path += utils.data_fn_str(type=covmat_type, instr=instr, band=band, id=id, set=set, notes=notes)
+        covmat_path += utils.data_fn_str(type=self.covmat_type, instr=instr, band=band, id=id, set=set, notes=notes)
         self._covmat = utils.atleast_nd(enmap.read_map(covmat_path), 5) # (nsplit, npol, npol, ny, nx)
 
         # beams
@@ -144,14 +151,18 @@ class Channel:
             else:
                 raise ValueError(f'{instr} must be one of "act", "planck", "wmap"')
 
-        # add realizations as necessary
+        # add cmb, noise realizations as necessary
         if cmb is not False:
+            if cmb is True:
+                cmb = None
             assert pysm, 'Can only add CMB realization to a simulated map'
-            self._map += utils.get_cmb_sim(self._map.shape, self._map.wcs, dtype=self._map.dtype, seed=cmb)
+            self._map += utils.get_cmb_sim(self.map.shape, self.map.wcs, dtype=self.map.dtype, seed=cmb)
 
         if noise is not False:
             assert pysm, 'Can only add a noise realization to a simulated map'
-            if covmat_type == 'icovar':
+            if noise is True:
+                noise = None
+            if self.covmat_type == 'icovar':
                 self._map += utils.get_icovar_noise_sim(icovar=self.covmat, seed=noise)
             else:
                 raise NotImplementedError('Correlated noise not yet implemented')
@@ -161,40 +172,6 @@ class Channel:
 
     def convolve_with_beam(self, bell):
         pass
-
-    @property
-    def instr(self):
-        return self._instr
-
-    @property
-    def band(self):
-        return self._band
-
-    @property
-    def id(self):
-        return self._id 
-
-    @property
-    def set(self):
-        return self._set 
-
-    @property
-    def notes(self):
-        return self._notes
-
-    @property
-    def correlated_noise(self):
-        if self._correlated_noise:
-            raise NotImplementedError('Correlated noise not yet implemented')
-        return self._correlated_noise
-
-    @property
-    def pysm(self):
-        return self._pysm
-
-    @property
-    def healpix(self):
-        return self._healpix
 
     @property
     def map(self):
@@ -211,3 +188,47 @@ class Channel:
     @property
     def bandpass(self):
         return self._bandpass
+
+
+class Params:
+
+    def __init__(self, shape, wcs, components, dtype=np.float32):
+        self.ncomp = len(list(components))
+        
+        # initialize amplitudes
+        self.check_shape(shape)
+        shape = (self.ncomp,) + shape
+        self._amplitudes = enmap.zeros(shape, wcs, dtype=dtype)
+
+        # for each component, store parameters that are either physically distinct or don't broadcast together.
+        # this must be implemented in each component, as a mappable under comp.params['active'].
+        # for convenience, also stored the fixed parameters (comp.params['fixed'])
+        self._params = {comp.name: comp.params for comp in components}
+        self.check_params()
+
+    @classmethod
+    def load_from_config(cls, config_path):
+        config = utils.config_from_yaml_file(config_path)
+
+    def check_shape(self, shape):
+        assert len(shape) == 3
+        assert shape[0] in (1,2,3), 'Only 1, 2, or 3 polarization components implemented'
+
+    def check_params(self):
+        assert len(self.params) == self.ncomp, 'At least one component has a repeated name, this is not allowed'
+        for k, v in self.params.items():
+            assert len(v) == 2, f'Component {k} params does not contain exactly "active" and "fixed" keys'
+            assert 'active' in v, f'Component {k} params does not contain "active" key, contains {v} instead'
+            assert 'fixed' in v, f'Component {k} params does not contain "fixed" key, contains {v} instead'
+
+    @property
+    def amplitude(self):
+        return self._amplitude
+
+    @property
+    def params(self):
+        return self._params
+
+    @params.setter
+    def params(self, name, param, val):
+        self._params[name]['active'][param] = val

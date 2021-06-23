@@ -4,9 +4,14 @@ import healpy as hp
 import matplotlib.pyplot as plt
 
 import numpy as np
+import argparse
 
-# path to save figures in 
-fig_path = '/scratch/gpfs/zatkins/data/ACTCollaboration/tacos/figures/plot_pysm_diffs/'
+parser = argparse.ArgumentParser(
+    'Check that our mixing matrix, color correction, and unit conversion work by recovering PySM inputs.')
+parser.add_argument('odir', type=str, help='Path to output dir')
+args = parser.parse_args()
+
+fig_path = args.odir
 
 # first get some Channels which we will compare to projected pysm inputs
 instr_band = {}
@@ -34,7 +39,7 @@ nu0_d = np.array([pysm_d.freq_ref_I.value, pysm_d.freq_ref_P.value, pysm_d.freq_
 beta_d = np.array(pysm_d.mbb_index)
 T_d = np.array(pysm_d.mbb_temperature)
 
-hcomponents = [models.Synch(nu0_s, beta_s), models.Dust(nu0_d, beta_d, T_d)]
+hcomponents = [models.Synch(nu0_s, beta=beta_s), models.Dust(nu0_d, beta=beta_d, T=T_d)]
 
 # get act geometry and project components to CAR
 shape, wcs = enmap.read_map_geometry(utils.data_dir_str('raw', 'act') + 'map_pa4_f150_night_set0.fits')
@@ -47,7 +52,7 @@ nu0_d_car = nu0_d.reshape(3, 1, 1)
 beta_d_car = reproject.enmap_from_healpix(beta_d, shape, wcs, rot=None)
 T_d_car = reproject.enmap_from_healpix(T_d, shape, wcs, rot=None)
 
-pcomponents = [models.Synch(nu0_s_car, beta_s_car), models.Dust(nu0_d_car, beta_d_car, T_d_car)]
+pcomponents = [models.Synch(nu0_s_car, beta=beta_s_car), models.Dust(nu0_d_car, beta=beta_d_car, T=T_d_car)]
 
 # get our mixing matrices
 pM = sampling.get_mixing_matrix(pchannels, pcomponents)
@@ -65,7 +70,7 @@ a_d_car = utils.atleast_nd(reproject.enmap_from_healpix(a_d, shape, wcs, ncomp=3
 pa = np.array([a_s_car, a_d_car])
 
 # project into maps
-hpmaps = np.einsum('jcax,cax->jax',hM,ha)
+hpmaps = np.einsum('jciax,cax->jiax',hM,ha)
 hrmaps = np.array([c.map for c in hchannels])
 
 ppmaps = np.einsum('jcmayx,cmayx->jmayx',pM,pa)
@@ -77,23 +82,23 @@ for j, channel in enumerate(hchannels):
         instr = channel.instr
         band = channel.band
         pol = 'IQU'[a]
-        hp.mollview((hpmaps - hrmaps)[j,a], unit='uK_CMB', title=f'Proj - PySM, {instr} {band}, {pol}')
+        hp.mollview((hpmaps - hrmaps)[j,0,a], unit='uK_CMB', title=f'Proj - PySM, {instr} {band}, {pol}')
         plt.savefig(fig_path + f'{instr}_{band}_{pol}_absdiff_healpix.png')
         plt.close()
-        utils.eplot((ppmaps - prmaps)[j,:,a], colorbar=True, grid=False, fname=fig_path + f'{instr}_{band}_{pol}_absdiff')
+        utils.eplot((ppmaps - prmaps)[j,0,a], colorbar=True, grid=False, fname=fig_path + f'{instr}_{band}_{pol}_absdiff')
 
 for j, channel in enumerate(hchannels):
     for a in range(3):
         instr = channel.instr
         band = channel.band
         pol = 'IQU'[a]
-        mean = 100*((hpmaps - hrmaps)/hpmaps)[j,a].mean()
-        std = 100*((hpmaps - hrmaps)/hpmaps)[j,a].std()
-        hp.mollview(100*((hpmaps - hrmaps)/hrmaps)[j,a], unit='%', title=f'(Proj - PySM)/Proj, {instr} {band}, {pol}', 
+        mean = 100*((hpmaps - hrmaps)/hpmaps)[j,0,a].mean()
+        std = 100*((hpmaps - hrmaps)/hpmaps)[j,0,a].std()
+        hp.mollview(100*((hpmaps - hrmaps)/hrmaps)[j,0,a], unit='%', title=f'(Proj - PySM)/Proj, {instr} {band}, {pol}', 
                     min=mean-std, max=mean+std)
         plt.savefig(fig_path + f'{instr}_{band}_{pol}_reldiff_healpix.png')
         plt.close()
-        utils.eplot(100*((prmaps - ppmaps)/prmaps)[j,:,a], colorbar=True, grid=False, fname=fig_path + f'{instr}_{band}_{pol}_reldiff')
+        utils.eplot(100*((prmaps - ppmaps)/prmaps)[j,0,a], colorbar=True, grid=False, fname=fig_path + f'{instr}_{band}_{pol}_reldiff')
 
 
 for j, channel in enumerate(hchannels):
@@ -102,14 +107,14 @@ for j, channel in enumerate(hchannels):
         band = channel.band
         pol = 'IQU'[a]
         print(instr, band)
-        hdiff = np.abs(((hpmaps - hrmaps)/hrmaps)[j,a])
+        hdiff = np.abs(((hpmaps - hrmaps)/hrmaps)[j,0,a])
         hmaxdiff = np.max(hdiff)
         hmeandiff = np.mean(hdiff)
-        hstdratio = np.std((hpmaps - hrmaps)[j,a]) / np.std(hrmaps[j,a])
-        pdiff = np.abs(((ppmaps - prmaps)/prmaps)[j,:,a])
+        hstdratio = np.std((hpmaps - hrmaps)[j,0,a]) / np.std(hrmaps[j,0,a])
+        pdiff = np.abs(((ppmaps - prmaps)/prmaps)[j,0,a])
         pmaxdiff = np.max(pdiff)
         pmeandiff = np.mean(pdiff)
-        pstdratio = np.std((ppmaps - prmaps)[j,:,a]) / np.std(prmaps[j,:,a])
+        pstdratio = np.std((ppmaps - prmaps)[j,0,a]) / np.std(prmaps[j,0,a])
         print(pol)
         print(f'maximum % difference -- healpix: {np.round(100*hmaxdiff, 5)}, car: {np.round(100*pmaxdiff, 5)}')
         print(f'mean % difference -- healpix: {np.round(100*hmeandiff, 5)}, car: {np.round(100*pmeandiff, 5)}')
