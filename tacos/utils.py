@@ -48,6 +48,12 @@ def data_dir_str(product, instr):
         product_dir=product_dir, instr=instr
     )
 
+def read_geometry(s):
+    """Return geometry from a file s. Shape trimmed to return only map axes.
+    """
+    shape, wcs = enmap.read_map_geometry(s)
+    return shape[-2:], wcs
+
 def eplot(x, *args, fname=None, show=False, **kwargs):
     """Return a list of enplot plots. Optionally, save and display them.
 
@@ -173,7 +179,7 @@ def expand_all_arg_dims(*args):
     return (np.atleast_1d(a)[..., None] for a in args)
 
 def expand_all_kwarg_dims(**kwargs):
-    return (np.atleast_1d(v)[..., None] for v in kwargs.values())
+    return {k: np.atleast_1d(v)[..., None] for k, v in kwargs.items()}
 
 def symmetrize(arr, axis1=0, axis2=1, method='average'):
     """Symmetrizes the input array along the specified axes.
