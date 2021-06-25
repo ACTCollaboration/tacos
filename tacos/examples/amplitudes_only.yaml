@@ -1,0 +1,59 @@
+parameters:
+    pol: QU # IQU, IU, IQ, QU, I, Q, U  --> just len(thing) important for now
+    geometry: '/projects/ACT/zatkins/data/ACTCollaboration/tacos/raw/act/map_pa4_f150_night_set0.fits' 
+    dtype: 'f4'
+
+channels:
+    wmap:
+        K:
+            pysm: True
+            noise: 0
+    act:
+        f090:
+            pysm: True
+            noise: 1
+    act:
+        f150:
+            pysm: True
+            noise: 2
+    act:
+        f220:
+            pysm: True
+            noise: 3
+    planck:
+        '353':
+            pysm: True
+            noise: 4
+
+components:
+    dust:
+        model: Dust
+        params:
+            beta:
+                # value: 1.6
+                shape: (60, 120)
+                broadcasters:
+                    P_to_QU:
+                        'None'
+                    simple_upgrade: 
+                        factor: 8
+            T:
+                value: 19.6
+        broadcasters:
+            P_to_QU:
+                'None'
+            simple_upgrade: 
+                factor: 8
+    synch:
+        model: Synch
+        params:
+            beta:
+                # value: -3.1
+                shape: (60, 120)
+                broadcasters:
+                    P_to_QU:
+                        'None'
+                    simple_upgrade: 
+                        factor: 8
+    cmb:
+        model: CMB        

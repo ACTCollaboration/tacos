@@ -94,7 +94,7 @@ class BandPass():
         self.rj_to_cmb = units.convert_rj_to_cmb(self.bandpass, self.nu)
         self.cmb_to_rj = units.convert_cmb_to_rj(self.bandpass, self.nu)
 
-    def integrate_signal(self, signal, axis=-1):
+    def integrate_signal(self, signal, signal_kwargs=None, axis=-1):
         '''
         Integrate signal over bandpass.
 
@@ -115,7 +115,10 @@ class BandPass():
         bandpass = self.bandpass(self.nu)
         
         if callable(signal):
-            signal = signal(self.nu)
+            if signal_kwargs:
+                signal = signal(self.nu, **signal_kwargs)
+            else:
+                signal = signal(self.nu)
         signal = np.atleast_1d(signal)
 
         # Reshape bandpass to allow broadcasting.

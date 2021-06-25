@@ -3,15 +3,20 @@ templates:
     T_dust: '/path/to/T_dust'
     beta_synch: '/path/to/beta_synch'
 
-interp_bounds:
+interpolation:
+    method: cubic
     Dust:
         beta: 
             low: -3.5
             high: 6.5
+            N: 1_000
+
         T:
             low: 5
             high: 45
+            N: 1_000
     Synch:
         beta:
             low: -8
             high: 2
+            N: 10_000

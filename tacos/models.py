@@ -33,8 +33,9 @@ class Model(ABC):
     # A model simply needs to store its possible parameters as an interable property
     # and be callable over frequencies
 
-    def __init__(self, nu0):
-        print(f'Setting reference frequency to {nu0/1e9} GHz')
+    def __init__(self, nu0, **kwargs):
+        if kwargs.get('verbose'):
+            print(f'Setting {self.__class__.__name__} reference frequency to {nu0/1e9} GHz')
         self._nu0 = nu0
 
     @property
@@ -52,8 +53,8 @@ class Model(ABC):
 
 class Dust(Model):
     
-    def __init__(self, nu0=353e9):
-        super().__init__(nu0)
+    def __init__(self, nu0=353e9, **kwargs):
+        super().__init__(nu0, **kwargs)
 
     # define all possible params
     @property
@@ -65,8 +66,8 @@ class Dust(Model):
 
 class Synch(Model):
 
-    def __init__(self, nu0=30e9):
-        super().__init__(nu0)
+    def __init__(self, nu0=30e9, **kwargs):
+        super().__init__(nu0, **kwargs)
 
     # define all possible params
     @property
@@ -78,8 +79,8 @@ class Synch(Model):
 
 class CMB(Model):
 
-    def __init__(self, nu0=100e9):
-        super().__init__(nu0)
+    def __init__(self, nu0=100e9, **kwargs):
+        super().__init__(nu0, **kwargs)
 
     # define all possible params
     @property

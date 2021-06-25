@@ -21,3 +21,9 @@ def P_to_QU(arr, axis=-3):
         return np.repeat(arr, [1, 2], axis=axis)
     else:
         raise ValueError(f'Axis {axis} length must be 1 or 2; is {arr.shape[axis]}')
+
+def simple_downgrade(arr, factor=1, op=np.mean):
+    # enmap downgrade needs a wcs
+    arr = enmap.enmap(arr, copy=False) # copying is slow!
+    arr = enmap.downgrade(arr, factor, op=op)
+    return np.asarray(arr)
