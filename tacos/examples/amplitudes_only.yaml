@@ -12,11 +12,9 @@ channels:
         f090:
             pysm: True
             noise: 1
-    act:
         f150:
             pysm: True
             noise: 2
-    act:
         f220:
             pysm: True
             noise: 3
@@ -39,21 +37,21 @@ components:
                         factor: 8
             T:
                 value: 19.6
-        broadcasters:
-            P_to_QU:
-                'None'
-            simple_upgrade: 
-                factor: 8
+        # broadcasters:
+        #     P_to_QU:
+        #         'None'
+        #     simple_upgrade: 
+        #         factor: 8
     synch:
         model: Synch
         params:
             beta:
-                # value: -3.1
-                shape: (60, 120)
-                broadcasters:
-                    P_to_QU:
-                        'None'
-                    simple_upgrade: 
-                        factor: 8
+                value: -3.1
+                # shape: (60, 120)
+                # broadcasters:
+                #     P_to_QU:
+                #         'None'
+                #     simple_upgrade: 
+                #         factor: 8
     cmb:
         model: CMB        

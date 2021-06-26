@@ -14,7 +14,7 @@ interpolation:
         T:
             low: 5
             high: 45
-            N: 1_000
+            N: 40
     Synch:
         beta:
             low: -8

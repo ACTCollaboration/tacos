@@ -1,5 +1,5 @@
-from tacos import utils, bandpass, data, sampling, models
-from pixell import enmap, enplot, reproject
+from tacos import utils, data, models, mixing_matrix as M
+from pixell import enmap, reproject
 import healpy as hp
 import matplotlib.pyplot as plt
 
@@ -55,8 +55,8 @@ T_d_car = reproject.enmap_from_healpix(T_d, shape, wcs, rot=None)
 pcomponents = [models.Synch(nu0_s_car, beta=beta_s_car), models.Dust(nu0_d_car, beta=beta_d_car, T=T_d_car)]
 
 # get our mixing matrices
-pM = sampling.get_mixing_matrix(pchannels, pcomponents)
-hM = sampling.get_mixing_matrix(hchannels, hcomponents)
+pM = M.get_mixing_matrix(pchannels, pcomponents)
+hM = M.get_mixing_matrix(hchannels, hcomponents)
 
 # get the amplitudes to project with our matrix from pysm
 # include minus sign for IAU
