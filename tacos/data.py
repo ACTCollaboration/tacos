@@ -6,10 +6,7 @@
 # all ivars have shape (num_splits, num_pol, num_pol, ny, nx)
 
 import numpy as np
-import yaml
-import pkgutil
 
-from soapack import interfaces as sints
 from pixell import enmap
 import healpy as hp
 

@@ -23,10 +23,8 @@
 import numpy as np
 
 from tacos import constants as cs, units, utils
-from pixell import enmap
 
 from abc import ABC, abstractmethod
-import os
 
 class Model(ABC):
 

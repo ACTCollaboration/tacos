@@ -357,6 +357,7 @@ class MixingMatrix:
         return cls(channels, components, shape, wcs, **kwargs)
 
 
+
 def get_mixing_matrix(channels, components, dtype=np.float32):
     '''
     Return mixing matrix for given frequency bands and signal

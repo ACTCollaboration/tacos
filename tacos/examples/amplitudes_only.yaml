@@ -1,6 +1,9 @@
 parameters:
+    # healpix: False
     pol: QU # IQU, IU, IQ, QU, I, Q, U  --> just len(thing) important for now
-    geometry: '/projects/ACT/zatkins/data/ACTCollaboration/tacos/raw/act/map_pa4_f150_night_set0.fits' 
+    geometry_from: '/projects/ACT/zatkins/data/ACTCollaboration/tacos/raw/act/map_pa4_f150_night_set0.fits'
+    # mapshape: (480, 960) 
+    # wcs_from: '/projects/ACT/zatkins/data/ACTCollaboration/tacos/raw/act/map_pa4_f150_night_set0.fits'
     dtype: 'f4'
 
 channels:

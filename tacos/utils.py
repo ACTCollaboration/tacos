@@ -1,5 +1,6 @@
 # helper utility functions
 from pixell import enmap, enplot, curvedsky, utils
+import healpy as hp 
 import camb
 
 import numpy as np
@@ -48,11 +49,15 @@ def data_dir_str(product, instr):
         product_dir=product_dir, instr=instr
     )
 
-def read_geometry(s):
+def read_geometry(s, healpix=False):
     """Return geometry from a file s. Shape trimmed to return only map axes.
     """
-    shape, wcs = enmap.read_map_geometry(s)
-    return shape[-2:], wcs
+    if healpix:
+        shape = hp.read_map(s).shape
+        return shape[-1]
+    else:
+        shape, wcs = enmap.read_map_geometry(s)
+        return shape[-2:], wcs
 
 def eplot(x, *args, fname=None, show=False, **kwargs):
     """Return a list of enplot plots. Optionally, save and display them.

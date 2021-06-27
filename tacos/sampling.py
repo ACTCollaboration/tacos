@@ -65,8 +65,8 @@ class Params:
         return tuple('IQU'.index(p) for p in pol)
 
     def check_shape(self):
-        assert len(self.shape) == 3
-        assert self.shape[-3] in (1,2,3), 'Polarization must have 1, 2, or 3 components'
+        assert len(self.shape) == 3 or len(self.shape) == 2 # car and healpix
+        assert self.shape[-len(self.shape)] in (1,2,3), 'Polarization must have 1, 2, or 3 components'
 
     def check_params(self):
         assert len(self.params) == self.ncomp, 'At least one component has a repeated name, this is not allowed'

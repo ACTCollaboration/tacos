@@ -2,7 +2,6 @@ import numpy as np
 from scipy.interpolate import interp1d
 import os  
 
-from pixell import enmap
 import h5py
 
 from tacos import units, utils
