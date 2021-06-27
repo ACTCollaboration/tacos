@@ -40,25 +40,7 @@ class Params:
 
     @classmethod
     def load_from_config(cls, config_path, verbose=False):
-        try:
-            config = utils.config_from_yaml_resource(config_path)
-        except FileNotFoundError:
-            config = utils.config_from_yaml_file(config_path)
-            
-        params_block = config['parameters']
-        components_block = config['components']
-
-        # get pol, shape, wcs, dtype
-        pol = params_block['pol']
-        shape, wcs = enmap.read_map_geometry(params_block['geometry'])
-        shape = (len(pol),) + shape[-2:]
-        kwargs = {'dtype': params_block.get('dtype')} if params_block.get('dtype') else {}
-
-        # get the components
-        # we can say verbose is False because we are just piggy-backing off the component load_from_config
-        # method to populate component name and active params; we don't care about other info
-        components = [M.Component.load_from_config(config_path, comp, verbose=verbose) for comp in components_block]
-
+        _, components, shape, wcs, kwargs = M.load_mixing_matrix_init_from_config(config_path, load_channels=False, verbose=True)
         return cls(components, shape, wcs, **kwargs)
 
     def get_pol_indices(self, pol):

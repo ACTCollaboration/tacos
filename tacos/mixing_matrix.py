@@ -286,19 +286,19 @@ class Element:
 
     def __call__(self, **kwargs):
 
-        # we need to build a spans dictionary in the proper order
-        spans = []
+        # we need to build a list of parameter values in the proper order
+        param_values = []
         for param in self.component.params:
         
             # broadcast active params, or grab already-broadcasted fixed params
             if param in self.component.active_params:
-                spans.append(self.component.broadcasters[param](kwargs[param]))
+                param_values.append(self.component.broadcasters[param](kwargs[param]))
             else:
                 assert param not in kwargs, f'Param {param} is fixed but was passed as a kwarg'
-                spans.append(self.component.fixed_params[param])
+                param_values.append(self.component.fixed_params[param])
 
         # interpolate, broadcast with component broadcaster
-        res = self.interpolator(*spans, **self.interpolator_call_kwargs)
+        res = self.interpolator(*param_values, **self.interpolator_call_kwargs)
         return self.channel.bandpass.rj_to_cmb * self.component.broadcaster(res)
 
 class MixingMatrix:
@@ -331,31 +331,35 @@ class MixingMatrix:
 
     @classmethod
     def load_from_config(cls, config_path, verbose=True):
-        try:
-            config = utils.config_from_yaml_resource(config_path)
-        except FileNotFoundError:
-            config = utils.config_from_yaml_file(config_path)
+        channels, components, shape, wcs, kwargs = load_mixing_matrix_init_from_config(config_path, verbose=verbose)
+        return cls(channels, components, shape, wcs, **kwargs)
 
-        # get list of channels
-        channels = []
+def load_mixing_matrix_init_from_config(config_path, load_channels=True, verbose=True):
+    try:
+        config = utils.config_from_yaml_resource(config_path)
+    except FileNotFoundError:
+        config = utils.config_from_yaml_file(config_path)
+
+    # get list of channels
+    channels = []
+    if load_channels:
         for instr, bands in config['channels'].items():
             for band, kwargs in bands.items():
                 channels.append(data.Channel(instr, band, **kwargs))
-                
-        # get list of components
-        components = []
-        for comp_name in config['components']:
-            components.append(Component.load_from_config(config_path, comp_name))
+            
+    # get list of components
+    components = []
+    for comp_name in config['components']:
+        components.append(Component.load_from_config(config_path, comp_name))
 
-        # get pol, shape, wcs, dtype
-        params_block = config['parameters']
-        pol = params_block['pol']
-        shape, wcs = enmap.read_map_geometry(params_block['geometry'])
-        shape = (len(pol),) + shape[-2:]
-        kwargs = {'dtype': params_block.get('dtype')} if params_block.get('dtype') else {}
+    # get pol, shape, wcs, dtype
+    params_block = config['parameters']
+    pol = params_block['pol']
+    shape, wcs = enmap.read_map_geometry(params_block['geometry'])
+    shape = (len(pol),) + shape[-2:]
+    kwargs = {'dtype': params_block.get('dtype')} if params_block.get('dtype') else {}
 
-        return cls(channels, components, shape, wcs, **kwargs)
-
+    return channels, components, shape, wcs, kwargs
 
 
 def get_mixing_matrix(channels, components, dtype=np.float32):
