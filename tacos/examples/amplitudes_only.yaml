@@ -1,9 +1,10 @@
 parameters:
-    # healpix: False
     pol: QU # IQU, IU, IQ, QU, I, Q, U  --> just len(thing) important for now
+    healpix: False
     geometry_from: '/projects/ACT/zatkins/data/ACTCollaboration/tacos/raw/act/map_pa4_f150_night_set0.fits'
-    # mapshape: (480, 960) 
+    # shape: (480, 960) 
     # wcs_from: '/projects/ACT/zatkins/data/ACTCollaboration/tacos/raw/act/map_pa4_f150_night_set0.fits'
+    # nside: 512
     dtype: 'f4'
 
 channels:
@@ -30,14 +31,14 @@ components:
     dust:
         model: Dust
         params:
-            beta:
-                # value: 1.6
-                shape: (60, 120)
-                broadcasters:
-                    P_to_QU:
-                        'None'
-                    simple_upgrade: 
-                        factor: 8
+            # beta:
+            #     # value: 1.6
+            #     shape: (60, 120)
+            #     broadcasters:
+            #         P_to_QU:
+            #             'None'
+            #         simple_upgrade: 
+            #             factor: 8
             T:
                 value: 19.6
         # broadcasters:

@@ -8,14 +8,19 @@ from tacos import utils, mixing_matrix as M
 
 class Params:
 
-    def __init__(self, components, shape, wcs, dtype=np.float32):
-        self.ncomp = len(list(components))
-        self.shape = shape
-        self.check_shape()
+    def __init__(self, components, shape, wcs=None, dtype=np.float32):
         
+        ncomp = len(list(components))
+        
+        self.shape = shape
+        utils.check_shape(self.shape)
+        
+        self._wcs = wcs # if this is None, return array as-is (ie, healpix), see amplitudes property
+        self._dtype = dtype
+
         # initialize amplitudes
         # amplitudes are a single array, with outermost axis for components
-        self._amplitudes = enmap.zeros((self.ncomp,) + self.shape, wcs, dtype=dtype)
+        self._amplitudes = np.zeros((ncomp,) + self.shape, dtype=dtype)
 
         # for each component, store parameters that are either physically distinct or don't broadcast together
         self._params = {
@@ -35,27 +40,23 @@ class Params:
                 
                 # params are multiple arrays, one for each parameter, unlike amplitudes
                 self.params[comp.name][active_param] = np.zeros(shape, dtype=dtype)
-
-        self.check_params()
+        assert len(self.params) == ncomp, 'At least one component has a repeated name, this is not allowed'
 
     @classmethod
     def load_from_config(cls, config_path, verbose=False):
-        _, components, shape, wcs, kwargs = M.load_mixing_matrix_init_from_config(config_path, load_channels=False, verbose=True)
+        _, components, _, shape, wcs, kwargs = M._load_all_from_config(config_path, load_channels=False, verbose=True)
         return cls(components, shape, wcs, **kwargs)
-
-    def get_pol_indices(self, pol):
-        return tuple('IQU'.index(p) for p in pol)
-
-    def check_shape(self):
-        assert len(self.shape) == 3 or len(self.shape) == 2 # car and healpix
-        assert self.shape[-len(self.shape)] in (1,2,3), 'Polarization must have 1, 2, or 3 components'
-
-    def check_params(self):
-        assert len(self.params) == self.ncomp, 'At least one component has a repeated name, this is not allowed'
        
     @property
     def amplitudes(self):
-        return self._amplitudes
+        if self._wcs is None:
+            return self._amplitudes
+        else:
+            return enmap.ndmap(self._amplitudes, self._wcs)
+
+    @amplitudes.setter
+    def amplitudes(self, arr):
+        self._amplitudes[:] = arr
 
     @property
     def params(self):

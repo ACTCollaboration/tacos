@@ -31,8 +31,8 @@ class Model(ABC):
     # A model simply needs to store its possible parameters as an interable property
     # and be callable over frequencies
 
-    def __init__(self, nu0, **kwargs):
-        if kwargs.get('verbose'):
+    def __init__(self, nu0, verbose=True):
+        if verbose:
             print(f'Setting {self.__class__.__name__} reference frequency to {nu0/1e9} GHz')
         self._nu0 = nu0
 

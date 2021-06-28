@@ -2,6 +2,7 @@ templates:
     beta_dust: '/path/to/beta_dust'
     T_dust: '/path/to/T_dust'
     beta_synch: '/path/to/beta_synch'
+    beta_dust_healpix: '/blah'
 
 interpolation:
     method: cubic
@@ -14,7 +15,7 @@ interpolation:
         T:
             low: 5
             high: 45
-            N: 40
+            N: 1_000
     Synch:
         beta:
             low: -8

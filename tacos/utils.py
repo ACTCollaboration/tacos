@@ -1,4 +1,5 @@
 # helper utility functions
+from multiprocessing import Value
 from pixell import enmap, enplot, curvedsky, utils
 import healpy as hp 
 import camb
@@ -7,6 +8,7 @@ import numpy as np
 import yaml
 
 import pkgutil
+from ast import literal_eval
 
 ### I/O ###
 
@@ -49,15 +51,100 @@ def data_dir_str(product, instr):
         product_dir=product_dir, instr=instr
     )
 
-def read_geometry(s, healpix=False):
+def read_geometry_from(s, healpix=False):
     """Return geometry from a file s. Shape trimmed to return only map axes.
     """
     if healpix:
         shape = hp.read_map(s).shape
-        return shape[-1]
+        return hp.npix2nside(shape[-1]) # just want the map shape, no pol
     else:
         shape, wcs = enmap.read_map_geometry(s)
-        return shape[-2:], wcs
+        return shape[-2:], wcs # just want the map shape, no pol
+
+def parse_parameters_block(params_block, verbose=True):
+    """Parse the parameters block of a config file and return the polarization string,
+    map shape (including polarization components), and optionally the wcs and other
+    kwargs to pass to MixingMatrix(...), Params(...) constructors.
+
+    Parameters
+    ----------
+    params_block : dict
+        A dictionary corresponding to the parameters block of a configuration file. See
+        notes for required entries.
+    verbose : bool
+        Print informative statements.
+
+    Notes
+    -----
+    Some keys in params_block are required. These are:
+        
+        healpix : bool
+        pol : a string in {IQU | IQ | IU | IQ | QU | I | Q | U}
+
+    Some keys in params_block are members of a set, only one of which must be provided:
+
+        {geometry_from : path | shape : tuple, wcs_from: path | nside: int}
+
+    Some keys in params_block are optional. These are:
+
+        dtype : string formatter for numpy datatype
+    """
+    polstr = params_block['pol']
+
+    # get whether to assume maps are in healpix
+    healpix = params_block['healpix']
+    if verbose:
+        pixstr = 'HEALPix' if healpix else 'CAR'
+        print(f'Maps assumed to be in {pixstr} pixelization')
+
+    # if geometry_from is provided, grab that info
+    if 'geometry_from' in params_block:
+        assert 'shape' not in params_block and 'wcs_from' not in params_block and 'nside' not in params_block, \
+            'Path to geometry, and shape, path to wcs, or nside provided; ambiguous'
+        if verbose:
+            print(f'Reading map geometry from path {params_block["geometry_from"]}')
+        geometry = read_geometry_from(params_block['geometry_from'], healpix)
+
+        # get the geometry-like objects for car vs. healpix
+        try:
+            shape, wcs = geometry # car
+        except ValueError:
+            nside, wcs = geometry, None # healpix
+            shape = tuple([hp.nside2npix(nside)]) # to get a tuple of length-1
+
+    # otherwise, grab shape and possibly wcs info
+    elif 'shape' in params_block:
+        assert not healpix, 'Maps in HEALPix; cannot supply shape or wcs in config'
+        assert 'geometry_from' not in params_block, \
+            'Path to geometry, and shape, path to wcs_provided; ambiguous'
+        if verbose:
+            print(f'Reading shape from config directly, found {params_block["shape"]}')
+        shape = literal_eval(params_block['shape'])
+
+        if verbose:
+            print(f'Reading wcs from path {params_block["wcs_from"]}')
+        _, wcs = read_geometry_from(params_block['wcs_from'], healpix=False)
+
+    # otherwise, grab nside
+    elif 'nside' in params_block:
+        assert healpix, 'Maps in HEALPix; must supply nside if not path to geometry'
+        assert 'geometry_from' not in params_block, \
+            'Path to geometry, and nside; ambiguous'
+        if verbose:
+            print(f'Reading nside from config directly, found {params_block["nside"]}')
+        shape = tuple([hp.nside2npix(params_block['nside'])])
+        wcs = None
+
+    # otherwise, throw error
+    else:
+        raise ValueError('Must supply sufficient geometry information in the config')
+
+    shape = (len(polstr),) + shape
+    kwargs = {'dtype': params_block.get('dtype')} if params_block.get('dtype') else {}
+    return polstr, shape, wcs, kwargs
+
+def get_pol_indices(polstr):
+    return tuple('IQU'.index(p) for p in polstr)
 
 def eplot(x, *args, fname=None, show=False, **kwargs):
     """Return a list of enplot plots. Optionally, save and display them.
@@ -290,7 +377,11 @@ def eigpow(A, e, axes=[-2, -1], rlim=None, alim=None):
 
     return O
 
-### Maps ###   
+### Maps ###
+
+def check_shape(shape):
+    assert len(shape) == 3 or len(shape) == 2 # car and healpix
+    assert shape[0] in (1,2,3), 'Polarization must have 1, 2, or 3 components' 
 
 def get_coadd_map(imap, ivar, axis=-4):
     """Returns the ivar-weighted coadd of the the imaps. The coaddition

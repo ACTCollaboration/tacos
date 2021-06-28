@@ -1,8 +1,10 @@
 import numpy as np
+from numpy.matrixlib.defmatrix import matrix
 from scipy import interpolate as interp
 from ast import literal_eval
 
 from pixell import enmap
+import healpy as hp 
 
 from tacos import data, utils, models, broadcasting
 
@@ -60,8 +62,6 @@ class Component:
             shapes = {}
         for param, shape in shapes.items():
             if param in self.active_params:
-                if verbose:
-                    print(f'Storing active param {param} shape {shape}')
                 self.shapes[param] = shapes[param]
 
     # This function oddly has no use when things are interpolated
@@ -83,12 +83,14 @@ class Component:
     @classmethod
     def load_from_config(cls, config_path, name, verbose=True):
 
-        # load the block under 'components' by name.
         # first look in the default configs, then assume 'config' is a full path
         try:
-            comp_block = utils.config_from_yaml_resource(config_path)['components'][name]
+            config = utils.config_from_yaml_resource(config_path)
         except FileNotFoundError:
-            comp_block = utils.config_from_yaml_file(config_path)['components'][name]
+            config = utils.config_from_yaml_file(config_path)
+
+        params_block = config['parameters']
+        comp_block = config['components'][name]
 
         # first get the model of the component
         model_name = comp_block['model']
@@ -108,8 +110,10 @@ class Component:
         if 'params' in comp_block:
             for param, info in comp_block['params'].items():
                 assert param in model.params, f'Param {param} not in {model_name} params'
-                kwargs = cls.load_fixed_param(kwargs, param, info, name, model_name, verbose=verbose)
-                param_broadcasters = cls.load_broadcasters(param, info, name, model_name, broadcasters=param_broadcasters, verbose=verbose)
+                kwargs = cls.load_fixed_param(kwargs, param, info, name, model_name, 
+                    healpix=params_block['healpix'], verbose=verbose)
+                param_broadcasters = cls.load_broadcasters(param, info, name, model_name,
+                    broadcasters=param_broadcasters, verbose=verbose)
                 shapes = cls.load_shape(shapes, param, info, name, model_name, verbose=verbose)
 
         # get component
@@ -118,7 +122,7 @@ class Component:
 
     # just helps modularize load_from_config(...)
     @classmethod
-    def load_fixed_param(cls, kwargs, param, info, comp_name, model_name, verbose=True):
+    def load_fixed_param(cls, kwargs, param, info, comp_name, model_name, healpix=False, verbose=True):
 
         # fixed parameters specified by key 'value'
         if 'value' in info:
@@ -137,14 +141,21 @@ class Component:
                 if info in config['templates']:
                     if verbose:
                         print(f'Fixing component {comp_name} (model {model_name}) param {param} to {value} template')
-                    value = enmap.read_map(config['templates'][value])
+                    if healpix:
+                        value = hp.read_map(config['templates'][value], field=None, dtype=np.float32)
+                    else:
+                        value = enmap.read_map(config['templates'][value])
                 else:
                     if verbose:
                         print(f'Fixing component {comp_name} (model {model_name}) param {param} to data at {value}')
-                    value = enmap.read_map(value)
+                    if healpix:
+                        value = hp.read_map(config['templates'][value], field=None, dtype=np.float32)
+                    else:
+                        value = enmap.read_map(config['templates'][value])
             
             # add it to the mapping we are building
             kwargs[param] = value
+        
         return kwargs
     
     # just helps modularize load_from_config(...)
@@ -183,11 +194,13 @@ class Component:
                 broadcasters[key] = stacked_broadcaster
             else:
                 broadcasters = stacked_broadcaster
+        
         return broadcasters
     
     # just helps modularize load_from_config(...)
     @classmethod
     def load_shape(cls, shapes, param, info, comp_name, model_name, verbose=True):
+        
         # shapes specified by key 'shapes'
         if 'shape' in info:
             shape = info['shape']
@@ -195,6 +208,7 @@ class Component:
             if verbose:
                 print(f'Setting component {comp_name} (model {model_name}) param {param} sampled shape to {shape}')
             shapes[param] = literal_eval(shape) # this maps a stringified tuple to the actual tuple
+        
         return shapes
 
     @property
@@ -257,6 +271,8 @@ class Element:
 
         # build interpolator
         nu = channel.bandpass.nu
+
+        # model has no non-linear parameters
         if len(spans) == 0:
             signal = component.model(nu)
             y = channel.bandpass.integrate_signal(signal) # this is one number!
@@ -264,12 +280,14 @@ class Element:
                 return y
             interpolator_call_kwargs = {}
 
+        # model has one non-linear parameter
         elif len(spans) == 1:
             signal = component.model(nu, **spans)
             y = channel.bandpass.integrate_signal(signal)
             interpolator = interp.interp1d(*spans.values(), y, kind=method)
             interpolator_call_kwargs = {}
 
+        # model has two non-linear parameter
         elif len(spans) == 2:
             meshed_spans = np.meshgrid(*spans.values(), indexing='ij', sparse=True)
             meshed_spans = {k: v for k, v in zip(spans.keys(), meshed_spans)}
@@ -303,20 +321,24 @@ class Element:
 
 class MixingMatrix:
     
-    def __init__(self, channels, components, shape, wcs, dtype=np.float32):
+    def __init__(self, channels, components, shape, wcs=None, dtype=np.float32):
 
         nchan = len(channels)
         ncomp = len(components)
 
-        self._elements = {}
+        self.shape = shape
+        utils.check_shape(self.shape)
+
+        self._wcs = wcs # if this is None, return array as-is (ie, healpix), see matrix property
         self._dtype = dtype
 
+        self._elements = {}
         for comp in components:
             self._elements[comp.name] = []
             for chan in channels:
                 self._elements[comp.name].append(Element(chan, comp))
-
-        self._matrix = enmap.zeros((nchan, ncomp) + shape, wcs=wcs, dtype=dtype)
+        
+        self._matrix = np.zeros((nchan, ncomp) + shape, dtype=dtype)
 
     def __call__(self, params_obj):
         assert params_obj.shape == self._matrix.shape[2:], \
@@ -331,10 +353,17 @@ class MixingMatrix:
 
     @classmethod
     def load_from_config(cls, config_path, verbose=True):
-        channels, components, shape, wcs, kwargs = load_mixing_matrix_init_from_config(config_path, verbose=verbose)
+        channels, components, _, shape, wcs, kwargs = _load_all_from_config(config_path, verbose=verbose)
         return cls(channels, components, shape, wcs, **kwargs)
 
-def load_mixing_matrix_init_from_config(config_path, load_channels=True, verbose=True):
+    @property
+    def matrix(self):
+        if self._wcs is None:
+            return self._matrix
+        else:
+            return enmap.ndmap(self._matrix, self._wcs)
+
+def _load_all_from_config(config_path, load_channels=True, verbose=True):
     try:
         config = utils.config_from_yaml_resource(config_path)
     except FileNotFoundError:
@@ -350,17 +379,12 @@ def load_mixing_matrix_init_from_config(config_path, load_channels=True, verbose
     # get list of components
     components = []
     for comp_name in config['components']:
-        components.append(Component.load_from_config(config_path, comp_name))
+        components.append(Component.load_from_config(config_path, comp_name, verbose=verbose))  
 
     # get pol, shape, wcs, dtype
     params_block = config['parameters']
-    pol = params_block['pol']
-    shape, wcs = enmap.read_map_geometry(params_block['geometry'])
-    shape = (len(pol),) + shape[-2:]
-    kwargs = {'dtype': params_block.get('dtype')} if params_block.get('dtype') else {}
-
-    return channels, components, shape, wcs, kwargs
-
+    polstr, shape, wcs, kwargs = utils.parse_parameters_block(params_block, verbose=verbose)    
+    return channels, components, polstr, shape, wcs, kwargs
 
 def get_mixing_matrix(channels, components, dtype=np.float32):
     '''
