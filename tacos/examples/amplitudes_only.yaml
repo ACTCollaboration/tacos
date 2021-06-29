@@ -10,57 +10,59 @@ parameters:
 channels:
     wmap:
         K:
-            'None': None
-            # pysm: True
-            # noise: 0
+            pysm: True
+            noise: 0
+            # cmb: 100
+
     act:
         f090:
-            'None': None
-            # pysm: True
-            # noise: 1
+            pysm: True
+            noise: 1
+            # cmb: 101
         f150:
-            'None': None
-            # pysm: True
-            # noise: 2
+            pysm: True
+            noise: 2
+            # cmb: 102
         f220:
-            'None': None
-            # pysm: True
-            # noise: 3
+            pysm: True
+            noise: 3
+            # cmb: 103
+
     planck:
         '353':
-            'None': None
-            # pysm: True
-            # noise: 4
+            pysm: True
+            noise: 4
+            # cmb: 104
 
 components:
     dust:
         model: Dust
         params:
             beta:
-                # value: 1.6
-                shape: (60, 120)
-                broadcasters:
-                    P_to_QU:
-                        'None'
-                    simple_upgrade: 
-                        factor: 8
-            T:
-                value: 19.6
-        # broadcasters:
-        #     P_to_QU:
-        #         'None'
-        #     simple_upgrade: 
-        #         factor: 8
-    synch:
-        model: Synch
-        params:
-            beta:
-                value: -3.1
-                # shape: (60, 120)
+                # value: pysm_Dust_beta
+                shape: (30, 60)
+                # shape: (12288,)
                 # broadcasters:
                 #     P_to_QU:
                 #         'None'
                 #     simple_upgrade: 
-                #         factor: 8
+                #         factor: 16
+            T:
+                value: pysm_Dust_T
+                # broadcasters:
+                #     simple_downgrade:
+                #         factor: 16
+        broadcasters:
+            P_to_QU:
+                'None'
+            simple_upgrade: 
+                factor: 16
+
+    synch:
+        model: Synch
+        params:
+            beta:
+                value: pysm_Synch_beta
+
     cmb:
         model: CMB        

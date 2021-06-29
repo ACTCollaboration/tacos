@@ -1,11 +1,13 @@
 templates:
-    beta_dust: '/path/to/beta_dust'
-    T_dust: '/path/to/T_dust'
-    beta_synch: '/path/to/beta_synch'
-    beta_dust_healpix: '/blah'
+    pysm_Dust_beta: '/projects/ACT/zatkins/data/ACTCollaboration/tacos/templates/pysm_Dust_beta.fits'
+    pysm_Dust_T: '/projects/ACT/zatkins/data/ACTCollaboration/tacos/templates/pysm_Dust_T.fits'
+    pysm_Synch_beta: '/projects/ACT/zatkins/data/ACTCollaboration/tacos/templates/pysm_Synch_beta.fits'
+    pysm_Dust_beta_healpix: '/projects/ACT/zatkins/data/ACTCollaboration/tacos/templates/pysm_Dust_beta_healpix.fits'
+    pysm_Dust_T_healpix: '/projects/ACT/zatkins/data/ACTCollaboration/tacos/templates/pysm_Dust_T_healpix.fits'
+    pysm_Synch_beta_healpix: '/projects/ACT/zatkins/data/ACTCollaboration/tacos/templates/pysm_Synch_beta_healpix.fits'
 
 interpolation:
-    method: cubic
+    method: 'cubic'
     Dust:
         beta: 
             low: -3.5

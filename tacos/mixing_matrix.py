@@ -2,6 +2,7 @@ import numpy as np
 from numpy.matrixlib.defmatrix import matrix
 from scipy import interpolate as interp
 from ast import literal_eval
+from os.path import splitext
 
 from pixell import enmap
 import healpy as hp 
@@ -92,6 +93,9 @@ class Component:
         params_block = config['parameters']
         comp_block = config['components'][name]
 
+        # get pixelization
+        healpix  =params_block['healpix']
+
         # first get the model of the component
         model_name = comp_block['model']
         nu0 = comp_block.get('nu0') # if not provided, use the default in models.py
@@ -99,7 +103,7 @@ class Component:
         model = getattr(models, model_name)(verbose=verbose, **model_kwargs)
 
         # get the component broadcaster, if any
-        comp_broadcaster =  cls.load_broadcasters(name, comp_block, name, model_name, verbose=verbose)
+        comp_broadcaster =  cls.load_broadcasters(name, comp_block, name, model_name, healpix=healpix, verbose=verbose)
 
         # if there are params, then:
         # for each parameter listed, determine if active or fixed and if fixed, then:
@@ -111,9 +115,9 @@ class Component:
             for param, info in comp_block['params'].items():
                 assert param in model.params, f'Param {param} not in {model_name} params'
                 kwargs = cls.load_fixed_param(kwargs, param, info, name, model_name, 
-                    healpix=params_block['healpix'], verbose=verbose)
+                    healpix=healpix, verbose=verbose)
                 param_broadcasters = cls.load_broadcasters(param, info, name, model_name,
-                    broadcasters=param_broadcasters, verbose=verbose)
+                    broadcasters=param_broadcasters, healpix=healpix, verbose=verbose)
                 shapes = cls.load_shape(shapes, param, info, name, model_name, verbose=verbose)
 
         # get component
@@ -138,10 +142,13 @@ class Component:
             # if string, first see if it is in the config templates
             # if not, load it directly
             elif isinstance(value, str):
-                if info in config['templates']:
+                if value in config['templates']:
                     if verbose:
                         print(f'Fixing component {comp_name} (model {model_name}) param {param} to {value} template')
                     if healpix:
+                        value_base, value_ext = splitext(value)
+                        value_base += '_healpix'
+                        value = value_base + value_ext
                         value = hp.read_map(config['templates'][value], field=None, dtype=np.float32)
                     else:
                         value = enmap.read_map(config['templates'][value])
@@ -160,7 +167,7 @@ class Component:
     
     # just helps modularize load_from_config(...)
     @classmethod
-    def load_broadcasters(cls, key, info, comp_name, model_name, broadcasters=None, verbose=True):
+    def load_broadcasters(cls, key, info, comp_name, model_name, broadcasters=None, healpix=False, verbose=True):
 
         # broadcasters specified by key 'broadcasters'
         if 'broadcasters' in info:        
@@ -179,8 +186,9 @@ class Component:
                 broadcaster = getattr(broadcasting, func_name)
                 func_list.append(broadcaster) 
                 if func_kwargs == 'None':
-                    kwarg_list.append({})
+                    kwarg_list.append({'healpix': healpix})
                 else:
+                    func_kwargs.update({'healpix': healpix})
                     kwarg_list.append(func_kwargs)
 
             # build a single function call stack
@@ -374,6 +382,8 @@ def _load_all_from_config(config_path, load_channels=True, verbose=True):
     if load_channels:
         for instr, bands in config['channels'].items():
             for band, kwargs in bands.items():
+                if kwargs == 'None':
+                    kwargs = {}
                 channels.append(data.Channel(instr, band, **kwargs))
             
     # get list of components
