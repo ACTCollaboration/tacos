@@ -58,7 +58,7 @@ class Channel:
     """
 
     def __init__(self, instr, band, id=None, set=None, notes=None, correlated_noise=False, pysm=False, 
-                    healpix=False, cmb=False, noise=False, beam_kwargs=None, bandpass_kwargs=None):
+                    healpix=False, cmb=False, noise=False, beam_kwargs=None, bandpass_kwargs=None, **kwargs):
         
         # modify args/kwargs
         if beam_kwargs is None:

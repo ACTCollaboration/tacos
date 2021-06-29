@@ -10,35 +10,40 @@ parameters:
 channels:
     wmap:
         K:
-            pysm: True
-            noise: 0
+            'None': None
+            # pysm: True
+            # noise: 0
     act:
         f090:
-            pysm: True
-            noise: 1
+            'None': None
+            # pysm: True
+            # noise: 1
         f150:
-            pysm: True
-            noise: 2
+            'None': None
+            # pysm: True
+            # noise: 2
         f220:
-            pysm: True
-            noise: 3
+            'None': None
+            # pysm: True
+            # noise: 3
     planck:
         '353':
-            pysm: True
-            noise: 4
+            'None': None
+            # pysm: True
+            # noise: 4
 
 components:
     dust:
         model: Dust
         params:
-            # beta:
-            #     # value: 1.6
-            #     shape: (60, 120)
-            #     broadcasters:
-            #         P_to_QU:
-            #             'None'
-            #         simple_upgrade: 
-            #             factor: 8
+            beta:
+                # value: 1.6
+                shape: (60, 120)
+                broadcasters:
+                    P_to_QU:
+                        'None'
+                    simple_upgrade: 
+                        factor: 8
             T:
                 value: 19.6
         # broadcasters:
