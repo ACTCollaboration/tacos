@@ -2,7 +2,7 @@ import numpy as np
 from numpy.matrixlib.defmatrix import matrix
 from scipy import interpolate as interp
 from ast import literal_eval
-from os.path import splitext
+import os
 
 from pixell import enmap
 import healpy as hp 
@@ -146,7 +146,7 @@ class Component:
                     if verbose:
                         print(f'Fixing component {comp_name} (model {model_name}) param {param} to {value} template')
                     if healpix:
-                        value_base, value_ext = splitext(value)
+                        value_base, value_ext = os.path.splitext(value)
                         value_base += '_healpix'
                         value = value_base + value_ext
                         value = hp.read_map(config['templates'][value], field=None, dtype=np.float32)
@@ -365,7 +365,7 @@ class MixingMatrix:
 
     @classmethod
     def load_from_config(cls, config_path, verbose=True):
-        channels, components, _, shape, wcs, kwargs = _load_all_from_config(config_path, verbose=verbose)
+        _, channels, components, _, shape, wcs, kwargs = _load_all_from_config(config_path, verbose=verbose)
         return cls(channels, components, shape, wcs, **kwargs)
 
     @property
@@ -397,8 +397,12 @@ def _load_all_from_config(config_path, load_channels=True, verbose=True):
 
     # get pol, shape, wcs, dtype
     params_block = config['parameters']
-    polstr, shape, wcs, kwargs = utils.parse_parameters_block(params_block, verbose=verbose)    
-    return channels, components, polstr, shape, wcs, kwargs
+    polstr, shape, wcs, kwargs = utils.parse_parameters_block(params_block, verbose=verbose)
+
+    # get name from config stem
+    config_base, _ = os.path.splitext(config_path)
+    name = os.path.basename(config_base)
+    return name, channels, components, polstr, shape, wcs, kwargs
 
 def get_mixing_matrix(channels, components, dtype=np.float32):
     '''

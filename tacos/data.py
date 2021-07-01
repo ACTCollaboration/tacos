@@ -117,7 +117,7 @@ class Channel:
 
         covmat_path = utils.data_dir_str('covmat', instr)
         covmat_path += utils.data_fn_str(type=self.covmat_type, instr=instr, band=band, id=id, set=set, notes=notes)
-        self._covmat = utils.atleast_nd(enmap.read_map(covmat_path), 5) # (nsplit, npol, npol, ny, nx)
+        self._covmat = enmap.read_map(covmat_path) # (npol, npol, ny, nx)
 
         # beams
         beam_path = utils.data_dir_str('beam', instr)

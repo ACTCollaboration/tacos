@@ -6,7 +6,6 @@ parameters:
     # wcs_from: '/projects/ACT/zatkins/data/ACTCollaboration/tacos/raw/act/map_pa4_f150_night_set0.fits'
     # nside: 512
     dtype: 'f4'
-    output_to: '/scratch/gpfs/zatkins'
 
 channels:
     wmap:
@@ -50,9 +49,9 @@ components:
                 #         factor: 16
             T:
                 value: pysm_Dust_T
-                # broadcasters:
-                #     simple_downgrade:
-                #         factor: 16
+                broadcasters:
+                    simple_downgrade:
+                        factor: 16
         broadcasters:
             P_to_QU:
                 'None'

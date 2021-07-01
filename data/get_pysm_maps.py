@@ -17,6 +17,7 @@ parser = argparse.ArgumentParser('Generate pysm maps at each band in this projec
     Default behavior of iau behavior argument may flip later.')
 parser.add_argument('--raw-is-iau', dest='raw_is_iau', default=False, action='store_true',
     help='If passed, assume raw data already in IAU convention. Default is False: multiply U by -1')
+parser.add_argument('--odtype', dest='odtype', type=str, default='f4', help='Numpy dtype str to apply to written products.')
 args = parser.parse_args()
 
 # get some basics
@@ -69,7 +70,7 @@ for instr in instr_band:
         extra = {'POLCCONV': 'IAU'}
 
         hmap_fn = utils.data_fn_str(type='map', instr='pysm', band=band, id='all', set='all', notes='healpix')
-        hp.write_map(mappath + hmap_fn, hmap, extra_header=extra, overwrite=True)
+        hp.write_map(mappath + hmap_fn, hmap.astype(args.odtype), extra_header=extra, overwrite=True)
 
         imap_fn = utils.data_fn_str(type='map', instr='pysm', band=band, id='all', set='all')
-        enmap.write_map(mappath + imap_fn, imap, extra=extra)
+        enmap.write_map(mappath + imap_fn, imap.astype(args.odtype), extra=extra)

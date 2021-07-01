@@ -6,23 +6,26 @@ from astropy.io import fits
 
 from tacos import utils, mixing_matrix as M
 
+config = utils.config_from_yaml_resource('configs/sampling.yaml')
+
 class Chain:
 
     @classmethod
     def load_from_config(cls, config_path, verbose=False):
-        _, components, _, shape, wcs, kwargs = M._load_all_from_config(config_path, load_channels=False, verbose=verbose)
-        return cls(components, shape, wcs, **kwargs)
+        name, _, components, _, shape, wcs, kwargs = M._load_all_from_config(config_path, load_channels=False, verbose=verbose)
+        return cls(components, shape, wcs, name=name, **kwargs)
 
-    def __init__(self, components, shape, wcs=None, dtype=np.float32, fname=None):
+    def __init__(self, components, shape, wcs=None, dtype=np.float32, name=None):
         
-        ncomp = len(list(components))
+        self._components = list(components)
+        ncomp = len(self._components)
         
-        self.shape = shape
-        utils.check_shape(self.shape)
+        self._shape = shape
+        utils.check_shape(self._shape)
         
         self._wcs = wcs # if this is None, return array as-is (ie, healpix), see amplitudes property
         self._dtype = dtype
-        self._fname = fname
+        self._name = name
 
         # initialize chain info, this is just weights and -2logposts
         self._weights = []
@@ -64,7 +67,7 @@ class Chain:
             f'The max. diff. in num. of iterations between chain objects is {diff}; expected {delta_length}'
 
     def _get_lengths(self):
-        lengths = (len(self.weights), len(self.amplitudes)) + self._get_params_lengths()
+        lengths = (len(self._weights), len(self._amplitudes)) + self._get_params_lengths()
         return lengths
 
     def _get_params_lengths(self):
@@ -101,7 +104,10 @@ class Chain:
         self._check_lengths()
 
     def get_params(self, iteration=-1):
-        return self._params[iteration]
+        return {
+            comp_name: {
+            param_name: self._params[comp_name][param_name][iteration] for param_name in active_params
+            } for comp_name, active_params in self._params.items()}
 
     def get_all_weights(self):
         return np.asarray(self._weights, dtype=self._dtype)
@@ -116,11 +122,50 @@ class Chain:
         out = {}
         for comp_name in self._params:
             out[comp_name] = {}
-            for active_param in out[comp_name]:
+            for active_param in self._params[comp_name]:
                 out[comp_name][active_param] = np.asarray(self._params[comp_name][active_param], dtype=self._dtype)
-        return self._params
+        return out
 
-    def dump(self, fname=None):
-        if fname is None:
-            fname = self._fname
+    def dump(self, fname=None, overwrite=True):
+        self._check_lengths(delta_length=0) # can only dumpy a complete chain
 
+        if fname is None and self._name is not None:
+            fname = config['output']['chain_path'] + self._name + '.fits'
+        else:
+            raise ValueError('Chain has no name; must supply explicit filename to dump to')
+
+        # first make the primary hdu. this will hold information informing us what the latter hdus are,
+        # which is always amplitudes, followed be each active param.
+        # the primary hdu itself holds the weights
+        primary_hdr = fits.Header()
+        primary_hdr['HDU1'] = 'AMPLITUDES'
+
+        hidx = 2
+        for comp, active_params in self._params.items():
+            for param in active_params:
+                primary_hdr[f'HDU{hidx}'] = f'{comp}_{param}'.upper()
+                hidx += 1
+
+        primary_hdu = fits.PrimaryHDU(data=self.get_all_weights(), header=primary_hdr)
+
+        # next make the actual hdus. the second is always the amplitudes
+        if self._wcs is not None:
+            amplitudes_hdr = self._wcs.to_header(relax=True) # if there is wcs information, retain it
+        else:
+            amplitudes_hdr = fits.Header()
+        amplitudes_hdu = fits.ImageHDU(data=self.get_all_amplitudes(), header=amplitudes_hdr)
+        hdul = fits.HDUList([primary_hdu, amplitudes_hdu])
+
+        all_params = self.get_all_params()
+        for comp, active_params in self._params.items():
+            for param in active_params:
+                hdul.append(fits.ImageHDU(data=all_params[comp][param]))
+        
+        # finally, write to disk and "reset" the chain to be empty
+        # TODO: implement appending to the file, instead of overwriting it
+        hdul.writeto(fname, overwrite=overwrite)
+        self.__init__(self._components, self._shape, self._wcs, self._dtype, self._name)
+
+    @property
+    def shape(self):
+        return self._shape
