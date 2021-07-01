@@ -107,9 +107,9 @@ class Channel:
         map_path += utils.data_fn_str(type='map', instr=map_instr, band=band, id=map_id, set=map_set, notes=map_notes)
         
         if pysm and healpix:
-            self._map = utils.atleast_nd(hp.read_map(map_path, field=None, dtype=np.float32), 3) # (nsplit, npol, npix)
+            self._map = hp.read_map(map_path, field=None, dtype=np.float32) # (npol, npix)
         elif not healpix:
-            self._map = utils.atleast_nd(enmap.read_map(map_path), 4) # (nsplit, npol, ny, nx)
+            self._map = enmap.read_map(map_path) # (npol, ny, nx)
         elif not pysm and healpix:
             raise NotImplementedError('There are no healpix maps of actual data')
         else:

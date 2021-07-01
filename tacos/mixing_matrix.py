@@ -348,12 +348,16 @@ class MixingMatrix:
         
         self._matrix = np.zeros((nchan, ncomp) + shape, dtype=dtype)
 
-    def __call__(self, params_obj):
-        assert params_obj.shape == self._matrix.shape[2:], \
-            f'Params object shape {params_obj.shape} must equal matrix shape {self.matrix.shape[2:]}'
-        
+    def __call__(self, chain=None, iteration=-1, **comp_params):
+        if chain is not None:
+            assert chain.shape == self._matrix.shape[2:], \
+                f'Params object shape {chain.shape} must equal matrix shape {self.matrix.shape[2:]}'
+            assert len(comp_params) == 0, \
+                'If Chain instance is passed, cannot also pass implicit component parameters'
+            comp_params = chain.get_params(iteration)
+
         # update Elements by component
-        for compidx, (comp_name, active_params) in enumerate(params_obj.params.items()):
+        for compidx, (comp_name, active_params) in enumerate(comp_params.items()):
             for chanidx, element in enumerate(self._elements[comp_name]):
                 self._matrix[chanidx, compidx] = element(**active_params)
 
