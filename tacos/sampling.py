@@ -25,26 +25,18 @@ class Chain:
         # amplitudes are a single array, with outermost axis for components
         self._amplitudes = np.zeros((1, ncomp) + self.shape, dtype=dtype)
 
-        # for each component, store parameters that are either physically distinct or don't broadcast together
+        # for each component with active parameters, store parameters separately.
+        # initialize them with zeros
         self._params = {}
         for comp in components:
-            if comp.active_params
-            comp.name: {
-                active_param: None for active_param in comp.active_params
-                } 
-            for comp in components
-            }
+            if comp.active_params:
+                for active_param in comp.active_params:
+                    if active_param in comp.shapes:
+                        shape = comp.shapes[active_param]
+                    else:
+                        shape = self.shape
+                    self.params[comp.name][active_param] = np.zeros((1,) + shape, dtype=dtype)
 
-        # additionally, initialize them with zeros
-        for comp in components:
-            for active_param in comp.active_params:
-                if active_param in comp.shapes:
-                    shape = comp.shapes[active_param]
-                else:
-                    shape = self.shape
-                
-                # params are multiple arrays, one for each parameter, unlike amplitudes
-                self.params[comp.name][active_param] = np.zeros((1,) + shape, dtype=dtype)
         assert len(self.params) == ncomp, 'At least one component has a repeated name, this is not allowed'
 
     def check_lengths(self, delta_length=1):
