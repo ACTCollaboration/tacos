@@ -28,7 +28,7 @@ class Chain:
         # for each component, store parameters that are either physically distinct or don't broadcast together
         self._params = {}
         for comp in components:
-            if comp.active_paras
+            if comp.active_params
             comp.name: {
                 active_param: None for active_param in comp.active_params
                 } 
