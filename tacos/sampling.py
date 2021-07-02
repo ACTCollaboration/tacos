@@ -126,7 +126,7 @@ class Chain:
                 out[comp_name][active_param] = np.asarray(self._params[comp_name][active_param], dtype=self._dtype)
         return out
 
-    def dump(self, fname=None, overwrite=True):
+    def dump(self, fname=None, overwrite=True, reset=True):
         self._check_lengths(delta_length=0) # can only dumpy a complete chain
 
         if fname is None and self._name is not None:
@@ -164,7 +164,8 @@ class Chain:
         # finally, write to disk and "reset" the chain to be empty
         # TODO: implement appending to the file, instead of overwriting it
         hdul.writeto(fname, overwrite=overwrite)
-        self.__init__(self._components, self._shape, self._wcs, self._dtype, self._name)
+        if reset:
+            self.__init__(self._components, self._shape, self._wcs, self._dtype, self._name)
 
     @property
     def shape(self):

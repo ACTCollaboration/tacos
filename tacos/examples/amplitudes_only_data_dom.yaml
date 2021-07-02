@@ -1,0 +1,49 @@
+parameters:
+    pol: QU 
+    healpix: False
+    geometry_from: '/projects/ACT/zatkins/data/ACTCollaboration/tacos/raw/act/map_pa4_f150_night_set0.fits'
+    dtype: 'f4'
+    prior_icovar_factor: 0.01
+    prior_offset: 100
+    num_steps: 100
+
+channels:
+    wmap:
+        K:
+            pysm: True
+            noise: 0
+    wmap:
+        Q:
+            pysm: True
+            noise: 11
+    act:
+        f090:
+            pysm: True
+            noise: 1
+        f150:
+            pysm: True
+            noise: 2
+        f220:
+            pysm: True
+            noise: 3
+    planck:
+        '217':
+            pysm: True
+            noise: 99
+        '353':
+            pysm: True
+            noise: 4
+
+components:
+    dust:
+        model: Dust
+        params:
+            beta:
+                value: pysm_Dust_beta
+            T:
+                value: pysm_Dust_T
+    synch:
+        model: Synch
+        params:
+            beta:
+                value: pysm_Synch_beta       
