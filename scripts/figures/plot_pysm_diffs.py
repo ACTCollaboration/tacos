@@ -65,16 +65,16 @@ a_d = np.array([pysm_d.I_ref.value, pysm_d.Q_ref.value, -pysm_d.U_ref.value])
 ha = np.array([a_s, a_d])
 
 # project amplitudes to CAR
-a_s_car = utils.atleast_nd(reproject.enmap_from_healpix(a_s, shape, wcs, ncomp=3, rot=None), 4)
-a_d_car = utils.atleast_nd(reproject.enmap_from_healpix(a_d, shape, wcs, ncomp=3, rot=None), 4)
+a_s_car = reproject.enmap_from_healpix(a_s, shape, wcs, ncomp=3, rot=None)
+a_d_car = reproject.enmap_from_healpix(a_d, shape, wcs, ncomp=3, rot=None)
 pa = np.array([a_s_car, a_d_car])
 
 # project into maps
 hpmaps = np.einsum('jciax,cax->jiax',hM,ha)
-hrmaps = np.array([c.map for c in hchannels])
+hrmaps = np.array([c.map[None] for c in hchannels])
 
 ppmaps = np.einsum('jcmayx,cmayx->jmayx',pM,pa)
-prmaps = np.array([c.map for c in pchannels])
+prmaps = np.array([c.map[None] for c in pchannels])
 
 # plot comparisons
 for j, channel in enumerate(hchannels):

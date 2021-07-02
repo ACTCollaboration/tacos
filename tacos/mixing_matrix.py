@@ -357,7 +357,8 @@ class MixingMatrix:
             comp_params = chain.get_params(iteration)
 
         # update Elements by component
-        for compidx, (comp_name, active_params) in enumerate(comp_params.items()):
+        for compidx, comp_name in enumerate(self._elements):
+            active_params = comp_params.get(comp_name, {})
             for chanidx, element in enumerate(self._elements[comp_name]):
                 self._matrix[chanidx, compidx] = element(**active_params)
 
@@ -375,7 +376,7 @@ class MixingMatrix:
         else:
             return enmap.ndmap(self._matrix, self._wcs)
 
-def _load_all_from_config(config_path, load_channels=True, verbose=True):
+def _load_all_from_config(config_path, load_channels=True, load_components=True, verbose=True):
     try:
         config = utils.config_from_yaml_resource(config_path)
     except FileNotFoundError:
@@ -392,8 +393,9 @@ def _load_all_from_config(config_path, load_channels=True, verbose=True):
             
     # get list of components
     components = []
-    for comp_name in config['components']:
-        components.append(Component.load_from_config(config_path, comp_name, verbose=verbose))  
+    if load_components:
+        for comp_name in config['components']:
+            components.append(Component.load_from_config(config_path, comp_name, verbose=verbose))  
 
     # get pol, shape, wcs, dtype
     params_block = config['parameters']
