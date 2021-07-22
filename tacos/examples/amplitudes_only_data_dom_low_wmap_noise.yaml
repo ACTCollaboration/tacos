@@ -12,10 +12,14 @@ channels:
         K:
             pysm: True
             noise: 0
+            noise_kwargs:
+                mult_fact: 100
     wmap:
         Q:
             pysm: True
             noise: 11
+            noise_kwargs:
+                mult_fact: 100
     act:
         f090:
             pysm: True

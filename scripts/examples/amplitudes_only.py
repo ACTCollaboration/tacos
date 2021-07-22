@@ -16,11 +16,13 @@ parser = argparse.ArgumentParser('Generate an example chain of only amplitudes',
 parser.add_argument('config_path', type=str, help='Path to run config, absolute or relative to tacos')
 args = parser.parse_args()
 
-# first load our easy fixed quantities: data, noise covariance, prior mean, and mixing matrix 
+
+# get whether this is prior or data dominated by "name"
 config_path = args.config_path
 prior = config_path.split('_dom')[0].split('only_')[1] == 'prior'
 print(prior)
 
+# get run paramaters
 name, channels, components, polstr, shape, wcs, kwargs = mixing_matrix._load_all_from_config(config_path, verbose=False)
 odtype = kwargs.get('dtype', np.float32)
 
@@ -28,21 +30,27 @@ nchan = len(channels)
 ncomp = len(components)
 npol = len(polstr)
 shape = shape[-2:]
+polidxs = np.array(['IQU'.index(char) for char in polstr])
 
-polsel = np.array(['IQU'.index(char) for char in polstr])
-
+# get run arguments
 config = utils.config_from_yaml_resource(config_path)
 prior_icovar_factor = config['parameters']['prior_icovar_factor']
 prior_offset = config['parameters']['prior_offset']
 num_steps = config['parameters']['num_steps']
 
-d = enmap.enmap([c.map for c in channels], wcs=wcs, dtype=odtype)[:, polsel, ...]
-N_inv = enmap.enmap([c.covmat for c in channels], wcs=wcs, dtype=odtype)[:, polsel][:, :, polsel, ...]
+# first load our easy fixed quantities: data, noise covariance, and mixing matrix 
+d = enmap.enmap([c.map for c in channels], wcs=wcs, dtype=odtype)[:, polidxs, ...]
+N_inv = enmap.enmap([c.covmat for c in channels], wcs=wcs, dtype=odtype)[(slice(None), *np.ix_(polidxs, polidxs))]
 M = mixing_matrix.MixingMatrix.load_from_config(config_path)()
 
 # next get our harder quantity: prior mean and prior covariance
 sky = pysm3.Sky(nside=512, preset_strings=['d1', 's1'], output_unit='uK_CMB')
 pysm_d, pysm_s = sky.components
+
+# also get diagonals for helping broadcast 
+delta_jj = np.eye(nchan)
+delta_cc = np.eye(ncomp)
+delta_aa = np.eye(npol)
 
 # get the amplitudes to project with our matrix from pysm
 # include minus sign for IAU
@@ -52,14 +60,17 @@ a_s = np.array([pysm_s.I_ref.value, pysm_s.Q_ref.value, -pysm_s.U_ref.value])
 # project amplitudes to CAR
 a_d_car = reproject.enmap_from_healpix(a_d, shape, wcs, ncomp=3, rot=None)
 a_s_car = reproject.enmap_from_healpix(a_s, shape, wcs, ncomp=3, rot=None)
-a = np.array([a_d_car, a_s_car])[:, polsel, ...]
+a = np.array([a_d_car, a_s_car])[:, polidxs, ...]
 m = a + prior_offset
 
 # first get projected N_inv and multiply by overall factor
-MN_invM = np.einsum('jca...,jab...,jcb...->cab...', M, N_inv, M)
+MN_invM = np.einsum('jca...,jab...,jdb...->cdab...', M, N_inv, M)
 S_inv = prior_icovar_factor * MN_invM
 
-# then, to make it non-trivial, let's double the diagonal
+# # then, to make it non-trivial, let's double the diagonal
+# # first flatten the correlated axes and then unflatten afterwards
+# diagonal = S_inv.reshape()
+
 # diagonal goes to last axis, see np.diagonal
 diagonal = np.diagonal(S_inv, axis1=1, axis2=2)
 
@@ -112,6 +123,8 @@ chain.dump(reset=False)
 
 # make some interesting plots 
 best = chain.get_all_amplitudes().mean(axis=0)
+
+# flatten component/pol axes to iterate over them
 m = enmap.samewcs(m.reshape(-1, 480, 960), best)
 Md = np.einsum('cab...,cb...->ca...', eigpow(MN_invM, -1, axes=(1, 2)), MN_invd)
 Md = enmap.samewcs(Md.reshape(-1, 480, 960), best)
@@ -122,11 +135,11 @@ for i in range(len(best.reshape(-1, 480, 960))):
     comp = ['dust', 'synch'][i//npol]
     pol = polstr[i%npol]
     if prior:
-        utils.eshow(m[i], colorbar=True, fname=f'/scratch/gpfs/zatkins/data/ACTCollaboration/tacos/examples/prior_{comp}_{pol}')
-        utils.eshow(pm[i], colorbar=True, fname=f'/scratch/gpfs/zatkins/data/ACTCollaboration/tacos/examples/best-prior_{comp}_{pol}')
+        utils.eshow(m[i], colorbar=True, fname=f'/scratch/gpfs/zatkins/data/ACTCollaboration/tacos/examples/prior_{comp}_{pol}_{chain.name}')
+        utils.eshow(pm[i], colorbar=True, fname=f'/scratch/gpfs/zatkins/data/ACTCollaboration/tacos/examples/best-prior_{comp}_{pol}_{chain.name}')
     else:
-        utils.eshow(Md[i], colorbar=True, fname=f'/scratch/gpfs/zatkins/data/ACTCollaboration/tacos/examples/data_{comp}_{pol}')
-        utils.eshow(pMd[i], colorbar=True, fname=f'/scratch/gpfs/zatkins/data/ACTCollaboration/tacos/examples/best-data_{comp}_{pol}')
+        utils.eshow(Md[i], colorbar=True, fname=f'/scratch/gpfs/zatkins/data/ACTCollaboration/tacos/examples/data_{comp}_{pol}_{chain.name}')
+        utils.eshow(pMd[i], colorbar=True, fname=f'/scratch/gpfs/zatkins/data/ACTCollaboration/tacos/examples/best-data_{comp}_{pol}_{chain.name}')
 
 mychi2 = chi2_per_pix(chain.get_all_amplitudes(), mean=best)
 fig = plt.figure(figsize=(8, 6))
@@ -136,5 +149,5 @@ plt.plot(x, chi2.pdf(x, df=ncomp*npol), linestyle='--', label=rf'$\chi^2_{ncomp*
 plt.xlim(0, 20)
 plt.legend()
 type = 'prior' if prior else 'data'
-plt.savefig(f'/scratch/gpfs/zatkins/data/ACTCollaboration/tacos/examples/chi2_{type}.png', bbox_inches='tight')
+plt.savefig(f'/scratch/gpfs/zatkins/data/ACTCollaboration/tacos/examples/chi2_{type}_{chain.name}.png', bbox_inches='tight')
 
