@@ -9,9 +9,16 @@ import argparse
 parser = argparse.ArgumentParser(
     'Check that our mixing matrix, color correction, and unit conversion work by recovering PySM inputs.')
 parser.add_argument('odir', type=str, help='Path to output dir')
+parser.add_argument('--notes', dest='notes', type=str, default='', help='Notes to append to map names')
+parser.add_argument('--tophat', dest='tophat', default=False, action='store_true', 
+    help='If passed, make tophat pysm maps. Default is false: use the full corresponding instrument band')
 args = parser.parse_args()
 
 fig_path = args.odir
+fig_path = fig_path + '/' if fig_path[-1] != '/' else fig_path
+notes = args.notes
+notes = 'tophat' if args.tophat and not notes else notes
+tophat = args.tophat
 
 # first get some Channels which we will compare to projected pysm inputs
 instr_band = {}
@@ -23,8 +30,10 @@ pchannels = []
 hchannels = []
 for instr in instr_band:
     for band in instr_band[instr]:
-        pchannels.append(data.Channel(instr, band, pysm=True, healpix=False))
-        hchannels.append(data.Channel(instr, band, pysm=True, healpix=True))
+
+        # now we want nu_sq_corr=True to match what pysm did (the default)
+        pchannels.append(data.Channel(instr, band, pysm=True, healpix=False, pysm_notes=notes, bandpass_kwargs={'tophat': tophat}))
+        hchannels.append(data.Channel(instr, band, pysm=True, healpix=True, pysm_notes=notes, bandpass_kwargs={'tophat': tophat}))
 
 # next get our two components for comparison, synchrotron and dust
 # to do this, first need inputs from pysm
@@ -78,6 +87,9 @@ hrmaps = np.array([c.map for c in hchannels])[..., 1:, :]
 ppmaps = np.einsum('jcayx,cayx->jayx',pM,pa)
 prmaps = np.array([c.map for c in pchannels])[..., 1:, :, :]
 
+if notes:
+    notes += '_'
+
 # plot comparisons
 for j, channel in enumerate(hchannels):
     for a in range(2):
@@ -85,9 +97,9 @@ for j, channel in enumerate(hchannels):
         band = channel.band
         pol = 'IQU'[a+1]
         hp.mollview((hpmaps - hrmaps)[j,a], unit='uK_CMB', title=f'Proj - PySM, {instr} {band}, {pol}')
-        plt.savefig(fig_path + f'{instr}_{band}_{pol}_absdiff_healpix.png')
+        plt.savefig(fig_path + f'{instr}_{band}_{pol}_{notes}absdiff_healpix.png')
         plt.close()
-        utils.eplot((ppmaps - prmaps)[j,a], colorbar=True, grid=False, fname=fig_path + f'{instr}_{band}_{pol}_absdiff')
+        utils.eplot((ppmaps - prmaps)[j,a], colorbar=True, grid=False, fname=fig_path + f'{instr}_{band}_{pol}_{notes}absdiff')
 
 for j, channel in enumerate(hchannels):
     for a in range(2):
@@ -98,9 +110,9 @@ for j, channel in enumerate(hchannels):
         std = 100*((hpmaps - hrmaps)/hpmaps)[j,a].std()
         hp.mollview(100*((hpmaps - hrmaps)/hrmaps)[j,a], unit='%', title=f'(Proj - PySM)/Proj, {instr} {band}, {pol}', 
                     min=mean-std, max=mean+std)
-        plt.savefig(fig_path + f'{instr}_{band}_{pol}_reldiff_healpix.png')
+        plt.savefig(fig_path + f'{instr}_{band}_{pol}_{notes}reldiff_healpix.png')
         plt.close()
-        utils.eplot(100*((prmaps - ppmaps)/prmaps)[j,a], colorbar=True, grid=False, fname=fig_path + f'{instr}_{band}_{pol}_reldiff')
+        utils.eplot(100*((prmaps - ppmaps)/prmaps)[j,a], colorbar=True, grid=False, fname=fig_path + f'{instr}_{band}_{pol}_{notes}reldiff')
 
 
 for j, channel in enumerate(hchannels):

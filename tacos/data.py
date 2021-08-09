@@ -31,6 +31,9 @@ class Channel:
         The data split, e.g. "set0", "set1", or "coadd"
     notes : str, optional
         Additional identifier to append to data filenames, by default None
+    pysm_notes : str, optional
+        Additional identifier unique to pysm data, by default None. Only operative if
+        pysm is True. If notes is passed but pysm_notes is not, assume pysm_notes = notes
     correlated_noise : bool, optional
         The noise model, by default False
     pysm : bool, optional
@@ -44,13 +47,13 @@ class Channel:
         tuple-of-int will be set as the seed of the realization. True will set cmb to
         None. Raises exception if pysm is False.
     cmb_kwargs : dict or None, optional
-        Any kwargs to pass to utils.get_cmb_sim(...). Default is {}
+        Any kwargs to pass to utils.get_cmb_sim(...), by default None
     noise : bool, None, int, or tuple-of-int
         Whether to add a noise realization to the map. False will pass; None, int, or
         tuple-of-int will be set as the seed of the realization. True will set cmb to
         None. Raises exception if pysm is False.
     noise_kwargs: dict or None, optional
-        Any kwargs to pass to utils.get_icovar_noise_sim(...). Default is {}
+        Any kwargs to pass to utils.get_icovar_noise_sim(...), by default None
     beam_kwargs : dict, optional
         kwargs to pass to beam.load_<instrument>_beam, by default None
     bandpass_kwargs : dict, optional
@@ -62,7 +65,7 @@ class Channel:
         Instrument must be one of "act", "planck", "wmap"
     """
 
-    def __init__(self, instr, band, id=None, set=None, notes=None, correlated_noise=False, pysm=False, 
+    def __init__(self, instr, band, id=None, set=None, notes=None, pysm_notes=None, correlated_noise=False, pysm=False, 
                     healpix=False, cmb=False, cmb_kwargs=None, noise=False, noise_kwargs=None, 
                     beam_kwargs=None, bandpass_kwargs=None, **kwargs):
         
@@ -96,13 +99,15 @@ class Channel:
             map_instr = 'pysm'
             map_id = 'all'
             map_set = 'all'
+            if not pysm_notes:
+                pysm_notes = notes # may still be None if notes is None
             if healpix:
-                if notes is None:
+                if not pysm_notes:
                     map_notes = 'healpix'
                 else:
-                    map_notes = 'healpix_' + notes
+                    map_notes = 'healpix_' + pysm_notes
             else:
-                map_notes = notes
+                map_notes = pysm_notes
         else:
             map_instr = instr
             map_id = id

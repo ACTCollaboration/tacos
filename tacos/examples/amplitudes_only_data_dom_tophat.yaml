@@ -1,0 +1,100 @@
+parameters:
+    pol: QU 
+    healpix: False
+    geometry_from: '/projects/ACT/zatkins/data/ACTCollaboration/tacos/raw/act/map_pa4_f150_night_set0.fits'
+    dtype: 'f4'
+    prior_icovar_factor: 0.01
+    prior_offset: 100
+    num_steps: 100
+
+channels:
+    wmap:
+        K:
+            pysm: True
+            noise: 0
+            pysm_notes: tophat
+            bandpass_kwargs:
+                tophat: True
+        Ka:
+            pysm: True
+            noise: 20
+            pysm_notes: tophat
+            bandpass_kwargs:
+                tophat: True
+        Q:
+            pysm: True
+            noise: 11
+            pysm_notes: tophat
+            bandpass_kwargs:
+                tophat: True
+        V:
+            pysm: True
+            noise: 21
+            pysm_notes: tophat
+            bandpass_kwargs:
+                tophat: True
+        W:
+            pysm: True
+            noise: 22
+            pysm_notes: tophat
+            bandpass_kwargs:
+                tophat: True
+    act:
+        f090:
+            pysm: True
+            noise: 1
+            pysm_notes: tophat
+            bandpass_kwargs:
+                tophat: True
+        f150:
+            pysm: True
+            noise: 2
+            pysm_notes: tophat
+            bandpass_kwargs:
+                tophat: True
+        f220:
+            pysm: True
+            noise: 3
+            pysm_notes: tophat
+            bandpass_kwargs:
+                tophat: True
+    planck:
+        '100':
+            pysm: True
+            noise: 30
+            pysm_notes: tophat
+            bandpass_kwargs:
+                tophat: True
+        '143':
+            pysm: True
+            noise: 31
+            pysm_notes: tophat
+            bandpass_kwargs:
+                tophat: True
+        '217':
+            pysm: True
+            noise: 99
+            pysm_notes: tophat
+            bandpass_kwargs:
+                tophat: True
+        '353':
+            pysm: True
+            noise: 4
+            pysm_notes: tophat
+            bandpass_kwargs:
+                tophat: True
+
+components:
+    dust:
+        model: Dust
+        params:
+            beta:
+                value: pysm_Dust_beta
+            T:
+                value: pysm_Dust_T
+    synch:
+        nu0: 23e9
+        model: Synch
+        params:
+            beta:
+                value: pysm_Synch_beta       

@@ -33,7 +33,7 @@ extensions = config_from_yaml_resource('configs/data.yaml')['extensions']
 def data_fn_str(type=None, instr=None, band=None, id=None, set=None, notes=None):
     """Returns a generic data filename, of format '{type}_{instr}_{band}_{id}_{set}{notes}.{ext}'
     """
-    if notes is None:
+    if not notes:
         notes = ''
     else:
         notes = '_' + notes

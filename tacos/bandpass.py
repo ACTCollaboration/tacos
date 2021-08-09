@@ -7,6 +7,7 @@ import h5py
 from tacos import units, utils
 
 config = utils.config_from_yaml_resource('configs/bandpass.yaml')
+tophat_config = utils.config_from_yaml_resource('configs/bandpass_pysm_tophat.yaml')
 
 class BandPass():
     '''
@@ -127,7 +128,7 @@ class BandPass():
         return np.trapz(signal * bandpass, x=self.nu, axis=axis)
 
     @classmethod
-    def load_act_bandpass(cls, filename, band, array=None):
+    def load_act_bandpass(cls, filename, band, array=None, **kwargs):
         '''
         Read ACT bandpass file and return class instance.
 
@@ -190,7 +191,7 @@ class BandPass():
 
     @classmethod
     def load_planck_bandpass(cls, filename, band, psb_only=True,
-                          nu_sq_corr=True):
+                          nu_sq_corr=True, **kwargs):
         '''
         Read Planck HFI bandpass file and return class instance.
 
@@ -219,7 +220,7 @@ class BandPass():
         # assert the instrument and filename match
         head, tail = os.path.split(filename)
         assert head.split('/')[-1] == 'planck'
-        assert tail.split('_')[1] == 'planck'
+        assert tail.split('_')[1] == 'planck' 
 
         bands = ['100', '143', '217', '353', '545', '857']
         if band not in bands:
@@ -306,7 +307,7 @@ class BandPass():
         return cls(bandpass, nu, **bandpass_kwargs)
 
     @classmethod
-    def load_pysm_bandpass(cls, filename, instr, band, nu_sq_corr=True, **bandpass_kwargs):
+    def load_pysm_bandpass(cls, filename, instr, band, nu_sq_corr=True, tophat=False, **bandpass_kwargs):
         """Read bandpass file corresponding to provided instrument and generate a pysm-tophat
         band over the same frequency range.
 
@@ -320,6 +321,9 @@ class BandPass():
             Band belonging to one of the instruments.
         nu_sq_corr : bool, optional
             Preprocess bandpasses by applying nu ** 2 correction factor., by default True
+        tophat : bool, optional
+            Load bandpass_kwargs for the pysm band from bandpass_pysm_tophat.yaml instead
+            of bandpass.yaml, by default False
 
         Returns
         -------
@@ -327,22 +331,35 @@ class BandPass():
             Bandpass instance giving a tophat over frequency of requested instrument, band.
         """
         # assert the instrument and filename match
-        head, tail = os.path.split(filename)
+        head, tail = os.path.split(filename) 
         assert head.split('/')[-1] == instr
         assert tail.split('_')[1] == instr
 
         if instr == 'act':
             bandpass_obj = cls.load_act_bandpass(filename, band, **bandpass_kwargs)
         elif instr == 'planck':
-            bandpass_obj = cls.load_planck_bandpass(filename, band, **bandpass_kwargs)
+            bandpass_obj = cls.load_planck_bandpass(filename, band, nu_sq_corr=True, **bandpass_kwargs)
         elif instr == 'wmap':
             bandpass_obj = cls.load_wmap_bandpass(filename, band, **bandpass_kwargs)
 
         nu = bandpass_obj.nu
-        bandpass = np.ones_like(nu)
+        bandpass = bandpass_obj.bandpass(nu)
 
+        # need to make another dummy bandpass_obj with the pysm config before 
+        # final modifications like a tophat to properly define the domain
+        if tophat:
+            bandpass_kwargs = tophat_config['pysm'][band] 
+        else:
+            bandpass_kwargs = config['pysm'][band]
+        
+        bandpass_obj = cls(bandpass, nu, **bandpass_kwargs)
+        nu = bandpass_obj.nu
+        bandpass = bandpass_obj.bandpass(nu)
+
+        # get final bandpass
+        if tophat:
+            bandpass = np.ones_like(nu)
         if nu_sq_corr:
             bandpass *= nu ** 2
 
-        bandpass_kwargs = config['pysm'][band]
         return cls(bandpass, nu, **bandpass_kwargs)

@@ -47,11 +47,6 @@ M = mixing_matrix.MixingMatrix.load_from_config(config_path)()
 sky = pysm3.Sky(nside=512, preset_strings=['d1', 's1'], output_unit='uK_CMB')
 pysm_d, pysm_s = sky.components
 
-# also get diagonals for helping broadcast 
-delta_jj = np.eye(nchan)
-delta_cc = np.eye(ncomp)
-delta_aa = np.eye(npol)
-
 # get the amplitudes to project with our matrix from pysm
 # include minus sign for IAU
 a_d = np.array([pysm_d.I_ref.value, pysm_d.Q_ref.value, -pysm_d.U_ref.value])
@@ -64,41 +59,44 @@ a = np.array([a_d_car, a_s_car])[:, polidxs, ...]
 m = a + prior_offset
 
 # first get projected N_inv and multiply by overall factor
-MN_invM = np.einsum('jca...,jab...,jdb...->cdab...', M, N_inv, M)
+MN_invM = np.einsum('jca...,jab...,jdb...->cadb...', M, N_inv, M)
 S_inv = prior_icovar_factor * MN_invM
 
-# # then, to make it non-trivial, let's double the diagonal
-# # first flatten the correlated axes and then unflatten afterwards
-# diagonal = S_inv.reshape()
+# then, to make it non-trivial, let's double the diagonal
+# first flatten the correlated axes and then unflatten afterwards
+diagonal = S_inv.reshape(ncomp*npol, ncomp*npol, *S_inv.shape[-2:])
 
-# diagonal goes to last axis, see np.diagonal
-diagonal = np.diagonal(S_inv, axis1=1, axis2=2)
+# # diagonal goes to last axis, see np.diagonal
+diagonal = np.diagonal(diagonal, axis1=0, axis2=1)
 
-# this puts the diagonal into something of shape (ncomp, npol, npol, ...)
+# this puts the diagonal back into something of shape (ncomp*npol, ncomp*npol, ...)
 # so it can broadcast against arr
-diagonal = np.einsum('ab,c...b->cab...', np.eye(npol, dtype=int), diagonal)
-S_inv += diagonal
+diagonal = np.einsum('ab,...b->ab...', np.eye(ncomp*npol, dtype=int), diagonal)
+S_inv += diagonal.reshape(ncomp, npol, ncomp, npol, *S_inv.shape[-2:])
 
 # let's make our various terms so the syntax is compact
 F_inv = S_inv + MN_invM
-F = eigpow(F_inv, -1, axes=(1, 2))
+F = eigpow(F_inv.reshape(ncomp*npol, ncomp*npol, *F_inv.shape[-2:]), -1, axes=(0, 1))
+F = F.reshape(ncomp, npol, ncomp, npol, *F.shape[-2:])
 
 MN_invd = np.einsum('jca...,jab...,jb...->ca...', M, N_inv, d)
-S_invm = np.einsum('cab...,cb...->ca...', S_inv, m)
 
-c = np.einsum('cab...,cb...->ca...', F, MN_invd + S_invm)
+S_invm = np.einsum('cadb...,ca...->db...', S_inv, m)
+
+c = np.einsum('cadb...,ca...->db...', F, MN_invd + S_invm)
 
 N_halfinv = eigpow(N_inv, 0.5, axes=(1, 2))
 MN_halfinv = np.einsum('jca...,jab...->jcab...', M, N_halfinv)
 
-S_halfinv = eigpow(S_inv, 0.5, axes=(1, 2))
+S_halfinv = eigpow(S_inv.reshape(ncomp*npol, ncomp*npol, *S_inv.shape[-2:]), 0.5, axes=(0, 1))
+S_halfinv = S_halfinv.reshape(ncomp, npol, ncomp, npol, *S_halfinv.shape[-2:])
 
 # let's now build our chain object, and define our chi^2 function
 chain = sampling.Chain.load_from_config(config_path)
 
 def chi2_per_pix(amp_samps, mean=c):
     delta = amp_samps - mean
-    return np.einsum('...cayx,...cabyx,...cbyx->...yx', delta, F_inv, delta)
+    return np.einsum('...cayx,...cadbyx,...dbyx->...yx', delta, F_inv, delta)
 
 # now let's sample! this is pretty simple
 for i in tqdm(range(num_steps)):
@@ -108,11 +106,11 @@ for i in tqdm(range(num_steps)):
 
     np.random.seed(tuple((1, i)))
     eta_m = np.random.randn(*(ncomp, npol, *shape))
-    S_halfinveta_s = np.einsum('cab...,cb...->ca...', S_halfinv, eta_m)
+    S_halfinveta_s = np.einsum('cadb...,ca...->db...', S_halfinv, eta_m)
 
     # solve for our sample
     RHS = MN_invd + S_invm + MN_halfinveta_d + S_halfinveta_s
-    x = np.einsum('cab...,cb...->ca...', F, RHS)
+    x = np.einsum('cadb...,ca...->db...', F, RHS)
     weight = [1, chi2_per_pix(x).mean()]
 
     # update the chain
@@ -126,7 +124,9 @@ best = chain.get_all_amplitudes().mean(axis=0)
 
 # flatten component/pol axes to iterate over them
 m = enmap.samewcs(m.reshape(-1, 480, 960), best)
-Md = np.einsum('cab...,cb...->ca...', eigpow(MN_invM, -1, axes=(1, 2)), MN_invd)
+MN_invM_INV = eigpow(MN_invM.reshape(ncomp*npol, ncomp*npol, *MN_invM.shape[-2:]), -1, axes=(0, 1))
+MN_invM_INV = MN_invM_INV.reshape(ncomp, npol, ncomp, npol, *MN_invM_INV.shape[-2:])
+Md = np.einsum('cadb...,ca...->db...', MN_invM_INV, MN_invd)
 Md = enmap.samewcs(Md.reshape(-1, 480, 960), best)
 
 pm = best.reshape(-1, 480, 960) - m
@@ -140,6 +140,8 @@ for i in range(len(best.reshape(-1, 480, 960))):
     else:
         utils.eshow(Md[i], colorbar=True, fname=f'/scratch/gpfs/zatkins/data/ACTCollaboration/tacos/examples/data_{comp}_{pol}_{chain.name}')
         utils.eshow(pMd[i], colorbar=True, fname=f'/scratch/gpfs/zatkins/data/ACTCollaboration/tacos/examples/best-data_{comp}_{pol}_{chain.name}')
+        utils.eshow(enmap.smooth_gauss(Md[i], np.radians(10/60) / np.sqrt(8 * np.log(2))), colorbar=True, fname=f'/scratch/gpfs/zatkins/data/ACTCollaboration/tacos/examples/data_smoothed_{comp}_{pol}_{chain.name}')
+        utils.eshow(enmap.smooth_gauss(pMd[i], np.radians(10/60) / np.sqrt(8 * np.log(2))), colorbar=True, fname=f'/scratch/gpfs/zatkins/data/ACTCollaboration/tacos/examples/best-data_smoothed_{comp}_{pol}_{chain.name}')
 
 mychi2 = chi2_per_pix(chain.get_all_amplitudes(), mean=best)
 fig = plt.figure(figsize=(8, 6))
