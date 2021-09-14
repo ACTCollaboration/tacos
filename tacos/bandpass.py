@@ -320,7 +320,7 @@ class BandPass():
         band : str
             Band belonging to one of the instruments.
         nu_sq_corr : bool, optional
-            Preprocess bandpasses by applying nu ** 2 correction factor., by default True
+            Preprocess bandpasses by applying nu ** 2 correction factor, by default True
         tophat : bool, optional
             Load bandpass_kwargs for the pysm band from bandpass_pysm_tophat.yaml instead
             of bandpass.yaml, by default False
@@ -328,7 +328,7 @@ class BandPass():
         Returns
         -------
         pysm_bandpass : bandpass.BandPass instance
-            Bandpass instance giving a tophat over frequency of requested instrument, band.
+            Bandpass instance of requested instrument, band; possibly a tophat of the same.
         """
         # assert the instrument and filename match
         head, tail = os.path.split(filename) 

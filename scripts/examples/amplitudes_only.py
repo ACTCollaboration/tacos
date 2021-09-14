@@ -20,7 +20,7 @@ args = parser.parse_args()
 # get whether this is prior or data dominated by "name"
 config_path = args.config_path
 prior = config_path.split('_dom')[0].split('only_')[1] == 'prior'
-print(prior)
+print(f'Prior_dom: {prior}')
 
 # get run paramaters
 name, channels, components, polstr, shape, wcs, kwargs = mixing_matrix._load_all_from_config(config_path, verbose=False)

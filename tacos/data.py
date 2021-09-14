@@ -17,57 +17,57 @@ from tacos.bandpass import BandPass
 # this is the main class representing a singular band of data, ie from one instrument
 # and one frequency (and optionally, one detector subset)
 class Channel:
-    """Channel instance holding map data, covariance data, bandpasses, and beams. 
-
-    Parameters
-    ----------
-    instr : str
-        The instrument of the data set to load. Must be one of "act", "planck", "wmap"
-    band : str
-        The band name within the instrument
-    id : str, optional
-        The subset of the instrument + band data, e.g. detectors, by default 'all'
-    set : str, optional
-        The data split, e.g. "set0", "set1", or "coadd"
-    notes : str, optional
-        Additional identifier to append to data filenames, by default None
-    pysm_notes : str, optional
-        Additional identifier unique to pysm data, by default None. Only operative if
-        pysm is True. If notes is passed but pysm_notes is not, assume pysm_notes = notes
-    correlated_noise : bool, optional
-        The noise model, by default False
-    pysm : bool, optional
-        Whether to load pysm data instead of actual data, by default False
-    healpix : bool, optional
-        Whether to use hp.read_map to load map data, by default False.
-        Only possible if pysm is True. Works by seeking "healpix" as first word
-        in filename notes.
-    cmb : bool, None, int, or tuple-of-int
-        Whether to add a CMB realization to the map. False will pass; None, int, or
-        tuple-of-int will be set as the seed of the realization. True will set cmb to
-        None. Raises exception if pysm is False.
-    cmb_kwargs : dict or None, optional
-        Any kwargs to pass to utils.get_cmb_sim(...), by default None
-    noise : bool, None, int, or tuple-of-int
-        Whether to add a noise realization to the map. False will pass; None, int, or
-        tuple-of-int will be set as the seed of the realization. True will set cmb to
-        None. Raises exception if pysm is False.
-    noise_kwargs: dict or None, optional
-        Any kwargs to pass to utils.get_icovar_noise_sim(...), by default None
-    beam_kwargs : dict, optional
-        kwargs to pass to beam.load_<instrument>_beam, by default None
-    bandpass_kwargs : dict, optional
-        kwargs to pass to BandPass.load_<instrument>_bandpass, by default None
-
-    Raises
-    ------
-    ValueError
-        Instrument must be one of "act", "planck", "wmap"
-    """
 
     def __init__(self, instr, band, id=None, set=None, notes=None, pysm_notes=None, correlated_noise=False, pysm=False, 
                     healpix=False, cmb=False, cmb_kwargs=None, noise=False, noise_kwargs=None, 
                     beam_kwargs=None, bandpass_kwargs=None, **kwargs):
+        """Channel instance holding map data, covariance data, bandpasses, and beams. 
+
+        Parameters
+        ----------
+        instr : str
+            The instrument of the data set to load. Must be one of "act", "planck", "wmap"
+        band : str
+            The band name within the instrument
+        id : str, optional
+            The subset of the instrument + band data, e.g. detectors, by default 'all'
+        set : str, optional
+            The data split, e.g. "set0", "set1", or "coadd"
+        notes : str, optional
+            Additional identifier to append to data filenames, by default None
+        pysm_notes : str, optional
+            Additional identifier unique to pysm data, by default None. Only operative if
+            pysm is True. If notes is passed but pysm_notes is not, assume pysm_notes = notes
+        correlated_noise : bool, optional
+            The noise model, by default False
+        pysm : bool, optional
+            Whether to load pysm data instead of actual data, by default False
+        healpix : bool, optional
+            Whether to use hp.read_map to load map data, by default False.
+            Only possible if pysm is True. Works by seeking "healpix" as first word
+            in filename notes.
+        cmb : bool, None, int, or tuple-of-int
+            Whether to add a CMB realization to the map. False will pass; None, int, or
+            tuple-of-int will be set as the seed of the realization. True will set cmb to
+            None. Raises exception if pysm is False.
+        cmb_kwargs : dict or None, optional
+            Any kwargs to pass to utils.get_cmb_sim(...), by default None
+        noise : bool, None, int, or tuple-of-int
+            Whether to add a noise realization to the map. False will pass; None, int, or
+            tuple-of-int will be set as the seed of the realization. True will set cmb to
+            None. Raises exception if pysm is False.
+        noise_kwargs: dict or None, optional
+            Any kwargs to pass to utils.get_icovar_noise_sim(...), by default None
+        beam_kwargs : dict, optional
+            kwargs to pass to beam.load_<instrument>_beam, by default None
+        bandpass_kwargs : dict, optional
+            kwargs to pass to BandPass.load_<instrument>_bandpass, by default None
+
+        Raises
+        ------
+        ValueError
+            Instrument must be one of "act", "planck", "wmap"
+        """
         
         # modify args/kwargs
         if beam_kwargs is None:
