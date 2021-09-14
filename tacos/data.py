@@ -5,6 +5,7 @@
 # all maps have shape (num_splits, num_pol, ny, nx)
 # all ivars have shape (num_splits, num_pol, num_pol, ny, nx)
 
+from healpy.pixelfunc import nside2resol
 import numpy as np
 
 from pixell import enmap
@@ -30,6 +31,9 @@ class Channel:
         The data split, e.g. "set0", "set1", or "coadd"
     notes : str, optional
         Additional identifier to append to data filenames, by default None
+    pysm_notes : str, optional
+        Additional identifier unique to pysm data, by default None. Only operative if
+        pysm is True. If notes is passed but pysm_notes is not, assume pysm_notes = notes
     correlated_noise : bool, optional
         The noise model, by default False
     pysm : bool, optional
@@ -42,10 +46,14 @@ class Channel:
         Whether to add a CMB realization to the map. False will pass; None, int, or
         tuple-of-int will be set as the seed of the realization. True will set cmb to
         None. Raises exception if pysm is False.
+    cmb_kwargs : dict or None, optional
+        Any kwargs to pass to utils.get_cmb_sim(...), by default None
     noise : bool, None, int, or tuple-of-int
         Whether to add a noise realization to the map. False will pass; None, int, or
         tuple-of-int will be set as the seed of the realization. True will set cmb to
         None. Raises exception if pysm is False.
+    noise_kwargs: dict or None, optional
+        Any kwargs to pass to utils.get_icovar_noise_sim(...), by default None
     beam_kwargs : dict, optional
         kwargs to pass to beam.load_<instrument>_beam, by default None
     bandpass_kwargs : dict, optional
@@ -57,8 +65,9 @@ class Channel:
         Instrument must be one of "act", "planck", "wmap"
     """
 
-    def __init__(self, instr, band, id=None, set=None, notes=None, correlated_noise=False, pysm=False, 
-                    healpix=False, cmb=False, noise=False, beam_kwargs=None, bandpass_kwargs=None, **kwargs):
+    def __init__(self, instr, band, id=None, set=None, notes=None, pysm_notes=None, correlated_noise=False, pysm=False, 
+                    healpix=False, cmb=False, cmb_kwargs=None, noise=False, noise_kwargs=None, 
+                    beam_kwargs=None, bandpass_kwargs=None, **kwargs):
         
         # modify args/kwargs
         if beam_kwargs is None:
@@ -90,13 +99,15 @@ class Channel:
             map_instr = 'pysm'
             map_id = 'all'
             map_set = 'all'
+            if not pysm_notes:
+                pysm_notes = notes # may still be None if notes is None
             if healpix:
-                if notes is None:
+                if not pysm_notes:
                     map_notes = 'healpix'
                 else:
-                    map_notes = 'healpix_' + notes
+                    map_notes = 'healpix_' + pysm_notes
             else:
-                map_notes = notes
+                map_notes = pysm_notes
         else:
             map_instr = instr
             map_id = id
@@ -117,7 +128,11 @@ class Channel:
 
         covmat_path = utils.data_dir_str('covmat', instr)
         covmat_path += utils.data_fn_str(type=self.covmat_type, instr=instr, band=band, id=id, set=set, notes=notes)
-        self._covmat = enmap.read_map(covmat_path) # (npol, npol, ny, nx)
+        
+        # add optional mult_fact from noise_kwargs
+        noise_kwargs = {} if noise_kwargs is None else noise_kwargs
+        mult_fact = noise_kwargs.get('mult_fact', 1)
+        self._covmat = mult_fact * enmap.read_map(covmat_path) # (npol, npol, ny, nx)
 
         # beams
         beam_path = utils.data_dir_str('beam', instr)
@@ -150,10 +165,11 @@ class Channel:
 
         # add cmb, noise realizations as necessary
         if cmb is not False:
+            assert pysm, 'Can only add CMB realization to a simulated map'
             if cmb is True:
                 cmb = None
-            assert pysm, 'Can only add CMB realization to a simulated map'
-            self._map += utils.get_cmb_sim(self.map.shape, self.map.wcs, dtype=self.map.dtype, seed=cmb)
+            cmb_kwargs = {} if cmb_kwargs is None else cmb_kwargs
+            self._map += utils.get_cmb_sim(self.map.shape, self.map.wcs, dtype=self.map.dtype, seed=cmb, **cmb_kwargs)
 
         if noise is not False:
             assert pysm, 'Can only add a noise realization to a simulated map'

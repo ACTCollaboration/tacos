@@ -18,6 +18,9 @@ parser = argparse.ArgumentParser('Generate pysm maps at each band in this projec
 parser.add_argument('--raw-is-iau', dest='raw_is_iau', default=False, action='store_true',
     help='If passed, assume raw data already in IAU convention. Default is False: multiply U by -1')
 parser.add_argument('--odtype', dest='odtype', type=str, default='f4', help='Numpy dtype str to apply to written products.')
+parser.add_argument('--notes', dest='notes', type=str, default='', help='Notes to append to map names')
+parser.add_argument('--tophat', dest='tophat', default=False, action='store_true', 
+    help='If passed, make tophat pysm maps. Default is False: use the full corresponding instrument band')
 args = parser.parse_args()
 
 # get some basics
@@ -51,11 +54,14 @@ for instr in instr_band:
         bandpass_path = utils.data_dir_str('bandpass', instr)
         bandpass_path += utils.data_fn_str(type='bandpass', instr=instr, band='all', id='all', set='all')
         
-        # pysm applies nu**2 to convert to Jy/sr from RJ, so we need to do the same (supply default nu_sq_corr=True)
-        bandpass = BandPass.load_pysm_bandpass(bandpass_path, instr, band)
+        # pysm applies nu**2 to convert to Jy/sr from RJ, so we will need to make sure to do 
+        # that when building our mixing matrix later (but not here)
+        bandpass = BandPass.load_pysm_bandpass(bandpass_path, instr, band, nu_sq_corr=False, tophat=args.tophat)
+        weights = bandpass.bandpass(bandpass.nu)
 
         # get the healpix map
-        hmap = sky.get_emission(bandpass.nu * pysm3.units.Hz)
+        # need to use weights kwarg here to make it general!
+        hmap = sky.get_emission(bandpass.nu * pysm3.units.Hz, weights=weights)
 
         # project map to act patch using SHT interpolation
         print('SHT interpolation of map')
@@ -69,8 +75,11 @@ for instr in instr_band:
         # save
         extra = {'POLCCONV': 'IAU'}
 
-        hmap_fn = utils.data_fn_str(type='map', instr='pysm', band=band, id='all', set='all', notes='healpix')
+        notes = args.notes
+        notes = 'tophat' if args.tophat and not notes else notes
+        hnotes = 'healpix' if not notes else f'healpix_{notes}'
+        hmap_fn = utils.data_fn_str(type='map', instr='pysm', band=band, id='all', set='all', notes=hnotes)
         hp.write_map(mappath + hmap_fn, hmap.astype(args.odtype), extra_header=extra, overwrite=True)
 
-        imap_fn = utils.data_fn_str(type='map', instr='pysm', band=band, id='all', set='all')
+        imap_fn = utils.data_fn_str(type='map', instr='pysm', band=band, id='all', set='all', notes=notes)
         enmap.write_map(mappath + imap_fn, imap.astype(args.odtype), extra=extra)

@@ -72,88 +72,63 @@ pysm:
         trim_zeros: True
         rtol: 1e-4
         atol: 0
-        nu_iterator: linspace
-        N: 5 
 
     f150:
         trim_zeros: True
         rtol: 1e-4
         atol: 0
-        nu_iterator: linspace
-        N: 5 
 
     f220:
         trim_zeros: True
         rtol: 1e-4
         atol: 0
-        nu_iterator: linspace
-        N: 5 
 
     '100':
         trim_zeros: True
         rtol: 1e-4
         atol: 0
-        nu_iterator: linspace
-        N: 5 
 
     '143':
         trim_zeros: True
         rtol: 1e-4
         atol: 0
-        nu_iterator: linspace
-        N: 5 
 
     '217':
         trim_zeros: True
         rtol: 1e-4
         atol: 0
-        nu_iterator: linspace
-        N: 5 
 
     '353':
         trim_zeros: True
         rtol: 1e-4
         atol: 0
-        nu_iterator: linspace
-        N: 5 
 
     '353_psb':
         trim_zeros: True
         rtol: 1e-4
         atol: 0
-        nu_iterator: linspace
-        N: 5 
+
     K:
         trim_zeros: True
         rtol: 1e-4
         atol: 0
-        nu_iterator: linspace
-        N: 5 
 
     Ka:
         trim_zeros: True
         rtol: 1e-4
         atol: 0
-        nu_iterator: linspace
-        N: 5 
 
     Q:
         trim_zeros: True
         rtol: 1e-4
         atol: 0
-        nu_iterator: linspace
-        N: 5 
 
     V:
         trim_zeros: True
         rtol: 1e-4
         atol: 0
-        nu_iterator: linspace
-        N: 5 
 
     W:
         trim_zeros: True
         rtol: 1e-4
         atol: 0
-        nu_iterator: linspace
-        N: 5 

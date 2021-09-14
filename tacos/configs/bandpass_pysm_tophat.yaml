@@ -1,0 +1,91 @@
+# hardcoded dictionary of bandpass limit information by instrument band
+pysm:
+    f090:
+        trim_zeros: True
+        rtol: 0.5
+        atol: 0
+        nu_iterator: linspace
+        N: 10 
+
+    f150:
+        trim_zeros: True
+        rtol: 0.5
+        atol: 0
+        nu_iterator: linspace
+        N: 10 
+
+    f220:
+        trim_zeros: True
+        rtol: 0.5
+        atol: 0
+        nu_iterator: linspace
+        N: 10 
+
+    '100':
+        trim_zeros: True
+        rtol: 0.5
+        atol: 0
+        nu_iterator: linspace
+        N: 10 
+
+    '143':
+        trim_zeros: True
+        rtol: 0.5
+        atol: 0
+        nu_iterator: linspace
+        N: 10
+
+    '217':
+        trim_zeros: True
+        rtol: 0.5
+        atol: 0
+        nu_iterator: linspace
+        N: 10 
+
+    '353':
+        trim_zeros: True
+        rtol: 0.5
+        atol: 0
+        nu_iterator: linspace
+        N: 10 
+
+    '353_psb':
+        trim_zeros: True
+        rtol: 0.5
+        atol: 0
+        nu_iterator: linspace
+        N: 10 
+    K:
+        trim_zeros: True
+        rtol: 0.5
+        atol: 0
+        nu_iterator: linspace
+        N: 10 
+
+    Ka:
+        trim_zeros: True
+        rtol: 0.5
+        atol: 0
+        nu_iterator: linspace
+        N: 10 
+
+    Q:
+        trim_zeros: True
+        rtol: 0.5
+        atol: 0
+        nu_iterator: linspace
+        N: 10 
+
+    V:
+        trim_zeros: True
+        rtol: 0.5
+        atol: 0
+        nu_iterator: linspace
+        N: 10 
+
+    W:
+        trim_zeros: True
+        rtol: 0.5
+        atol: 0
+        nu_iterator: linspace
+        N: 10 

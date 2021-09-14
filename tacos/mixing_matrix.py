@@ -99,7 +99,7 @@ class Component:
         # first get the model of the component
         model_name = comp_block['model']
         nu0 = comp_block.get('nu0') # if not provided, use the default in models.py
-        model_kwargs = {'nu0': float(nu0)} if nu0 else {}
+        model_kwargs = {'nu0': literal_eval(nu0)} if nu0 else {}
         model = getattr(models, model_name)(verbose=verbose, **model_kwargs)
 
         # get the component broadcaster, if any

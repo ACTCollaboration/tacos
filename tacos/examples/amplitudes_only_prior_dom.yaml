@@ -43,6 +43,7 @@ components:
             T:
                 value: pysm_Dust_T
     synch:
+        nu0: 23e9
         model: Synch
         params:
             beta:

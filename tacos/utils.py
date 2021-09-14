@@ -33,7 +33,7 @@ extensions = config_from_yaml_resource('configs/data.yaml')['extensions']
 def data_fn_str(type=None, instr=None, band=None, id=None, set=None, notes=None):
     """Returns a generic data filename, of format '{type}_{instr}_{band}_{id}_{set}{notes}.{ext}'
     """
-    if notes is None:
+    if not notes:
         notes = ''
     else:
         notes = '_' + notes
@@ -482,7 +482,7 @@ def get_coadd_map_icovar(imap, icovar, imap_split_axis=-4, imap_icovar_axis=-3, 
 
     return omap
 
-def get_icovar_noise_sim(icovar, icovar_axis1=-4, icovar_axis2=-3, seed=None):
+def get_icovar_noise_sim(icovar, icovar_axis1=-4, icovar_axis2=-3, seed=None, mult_fact=1):
     """Given a pixel-space inverse covariance matrix, draw a noise simulation
     directly from it.
 
@@ -496,6 +496,9 @@ def get_icovar_noise_sim(icovar, icovar_axis1=-4, icovar_axis2=-3, seed=None):
         The axis in imaps corresponding to the second covaried component, by default -3
     seed : int or tuple of ints, optional
         The seed of the random draw, by default None
+    mult_fact: int, optional
+        Multiply icovar to manually adjust level of inverse-covariance, useful for
+        testing, by default 1
 
     Returns
     -------
@@ -532,7 +535,7 @@ def get_icovar_noise_sim(icovar, icovar_axis1=-4, icovar_axis2=-3, seed=None):
     # we want covar**0.5, which is icovar**-0.5, then
     # draw a map-space sample into the right shape
     # finally, move axes back if necessary
-    icovar = eigpow(icovar, -0.5, axes=(icovar_axis1, icovar_axis2))
+    icovar = eigpow(mult_fact * icovar, -0.5, axes=(icovar_axis1, icovar_axis2))
     x = np.random.randn(*oshape).astype(icovar.dtype)
     res = np.einsum('...ijyx,...jyx->...iyx', icovar, x)
     res = np.moveaxis(res, -3, icovar_axis2)

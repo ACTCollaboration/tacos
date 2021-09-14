@@ -170,3 +170,7 @@ class Chain:
     @property
     def shape(self):
         return self._shape
+
+    @property
+    def name(self):
+        return self._name
