@@ -54,7 +54,8 @@ for instr in instr_band:
         bandpass_path = utils.data_dir_str('bandpass', instr)
         bandpass_path += utils.data_fn_str(type='bandpass', instr=instr, band='all', id='all', set='all')
         
-        # pysm applies nu**2 to convert to Jy/sr from RJ, so we will need to make sure to do 
+        # pysm applies nu**2 to convert to Jy/sr from RJ (inside get_emission,
+        # inside normalize_weights), so we will need to make sure to do 
         # that when building our mixing matrix later (but not here)
         bandpass = BandPass.load_pysm_bandpass(bandpass_path, instr, band, nu_sq_corr=False, tophat=args.tophat)
         weights = bandpass.bandpass(bandpass.nu)

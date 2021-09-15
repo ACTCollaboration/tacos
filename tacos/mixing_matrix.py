@@ -63,7 +63,7 @@ class Component:
             shapes = {}
         for param, shape in shapes.items():
             if param in self.active_params:
-                self.shapes[param] = shapes[param]
+                self.shapes[param] = shape
 
     # This function oddly has no use when things are interpolated
     # I think it will come in handy when evaluating a proposal that has gone "out of bounds" TODO: implement that

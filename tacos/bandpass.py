@@ -307,7 +307,7 @@ class BandPass():
         return cls(bandpass, nu, **bandpass_kwargs)
 
     @classmethod
-    def load_pysm_bandpass(cls, filename, instr, band, nu_sq_corr=True, tophat=False, **bandpass_kwargs):
+    def load_pysm_bandpass(cls, filename, instr, band, nu_sq_corr=True, tophat=False, **load_kwargs):
         """Read bandpass file corresponding to provided instrument and generate a pysm-tophat
         band over the same frequency range.
 
@@ -336,11 +336,11 @@ class BandPass():
         assert tail.split('_')[1] == instr
 
         if instr == 'act':
-            bandpass_obj = cls.load_act_bandpass(filename, band, **bandpass_kwargs)
+            bandpass_obj = cls.load_act_bandpass(filename, band, **load_kwargs)
         elif instr == 'planck':
-            bandpass_obj = cls.load_planck_bandpass(filename, band, nu_sq_corr=True, **bandpass_kwargs)
+            bandpass_obj = cls.load_planck_bandpass(filename, band, nu_sq_corr=True, **load_kwargs)
         elif instr == 'wmap':
-            bandpass_obj = cls.load_wmap_bandpass(filename, band, **bandpass_kwargs)
+            bandpass_obj = cls.load_wmap_bandpass(filename, band, **load_kwargs)
 
         nu = bandpass_obj.nu
         bandpass = bandpass_obj.bandpass(nu)
