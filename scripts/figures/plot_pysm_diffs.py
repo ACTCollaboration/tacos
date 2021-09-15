@@ -16,6 +16,8 @@ parser.add_argument('--notes', dest='notes', type=str, default='', help='Notes t
 parser.add_argument('--tophat', dest='tophat', default=False, action='store_true', 
     help='If passed, make tophat pysm maps. Default is false: use the full corresponding instrument band. ' + 
     'If notes not passed and tophat is passed, note will be "tophat"')
+parser.add_argument('--interpolated', dest='interpolated', default=False, action='store_true',
+    help='If passed, build an interpolated mixing matrix instead of an exact one.')
 args = parser.parse_args()
 
 fig_path = args.odir
@@ -23,6 +25,8 @@ fig_path = fig_path + '/' if fig_path[-1] != '/' else fig_path
 notes = args.notes
 notes = 'tophat' if args.tophat and not notes else notes
 tophat = args.tophat
+interpolated = args.interpolated
+print(f'Interpolated: {interpolated}')
 
 # first get some Channels which we will compare to projected pysm inputs
 instr_band = {}
@@ -78,8 +82,13 @@ a_s_car = reproject.enmap_from_healpix(a_s, shape, wcs, ncomp=3, rot=None)
 a_d_car = reproject.enmap_from_healpix(a_d, shape, wcs, ncomp=3, rot=None)
 pa = np.array([a_s_car, a_d_car])[:, 1:, ...]
 
-pM = M.get_exact_mixing_matrix(pchannels, pcomponents, (2,) + shape, wcs=wcs)
-hM = M.get_exact_mixing_matrix(hchannels, hcomponents, (2,) + T_d.shape)
+# get mixing matrices
+if interpolated:
+    pM = M.MixingMatrix(pchannels, pcomponents, (2,) + shape, wcs=wcs)()
+    hM = M.MixingMatrix(hchannels, hcomponents, (2,) + T_d.shape)()
+else:
+    pM = M.get_exact_mixing_matrix(pchannels, pcomponents, (2,) + shape, wcs=wcs)
+    hM = M.get_exact_mixing_matrix(hchannels, hcomponents, (2,) + T_d.shape)
 
 print(ha.shape, hM.shape)
 print(pa.shape, pM.shape)
