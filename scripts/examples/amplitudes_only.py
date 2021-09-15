@@ -1,4 +1,4 @@
-from tacos import utils, sampling, mixing_matrix
+from tacos import utils, chain, mixing_matrix
 from tacos.utils import eigpow
 
 from pixell import enmap, reproject
@@ -92,7 +92,7 @@ S_halfinv = eigpow(S_inv.reshape(ncomp*npol, ncomp*npol, *S_inv.shape[-2:]), 0.5
 S_halfinv = S_halfinv.reshape(ncomp, npol, ncomp, npol, *S_halfinv.shape[-2:])
 
 # let's now build our chain object, and define our chi^2 function
-chain = sampling.Chain.load_from_config(config_path)
+chain = chain.Chain.load_from_config(config_path)
 
 def chi2_per_pix(amp_samps, mean=c):
     delta = amp_samps - mean
@@ -114,8 +114,8 @@ for i in tqdm(range(num_steps)):
     weight = [1, chi2_per_pix(x).mean()]
 
     # update the chain
-    chain.append_weights(weight)
-    chain.append_amplitudes(x)
+    chain.add_weights(weight)
+    chain.add_amplitudes(x)
 
 chain.dump(reset=False)
 

@@ -567,7 +567,7 @@ def get_cmb_sim(shape, wcs, H0=67.9, lmax=6_000, dtype=np.float32, seed=None):
     ndmap
         Map of the realization, of shape (ncomp, ny,nx)
     """
-    shape = atleast_nd(np.zeros(shape), 3).shape[-3:]
+    shape = atleast_nd(np.empty(shape), 3).shape[-3:]
 
     # get power spectra
     params = camb.model.CAMBparams()

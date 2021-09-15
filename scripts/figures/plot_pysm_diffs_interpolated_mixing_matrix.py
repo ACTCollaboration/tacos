@@ -1,6 +1,8 @@
 from tacos import utils, data, models, sampling, mixing_matrix as M
 from pixell import enmap, reproject
 import healpy as hp
+import matplotlib
+matplotlib.use('agg')
 import matplotlib.pyplot as plt
 
 import numpy as np
@@ -9,9 +11,11 @@ import argparse
 parser = argparse.ArgumentParser(
     'Check that our mixing matrix, color correction, and unit conversion work by recovering PySM inputs.')
 parser.add_argument('odir', type=str, help='Path to output dir')
-parser.add_argument('--notes', dest='notes', type=str, default='', help='Notes to append to map names')
+parser.add_argument('--notes', dest='notes', type=str, default='', help='Notes to append to map names. ' +
+                    'If notes not passed and tophat is passed, note will be "tophat"')
 parser.add_argument('--tophat', dest='tophat', default=False, action='store_true', 
-    help='If passed, make tophat pysm maps. Default is false: use the full corresponding instrument band')
+    help='If passed, make tophat pysm maps. Default is false: use the full corresponding instrument band. ' + 
+    'If notes not passed and tophat is passed, note will be "tophat"')
 args = parser.parse_args()
 
 fig_path = args.odir
@@ -74,8 +78,8 @@ a_s_car = reproject.enmap_from_healpix(a_s, shape, wcs, ncomp=3, rot=None)
 a_d_car = reproject.enmap_from_healpix(a_d, shape, wcs, ncomp=3, rot=None)
 pa = np.array([a_s_car, a_d_car])[:, 1:, ...]
 
-pM = M.MixingMatrix(pchannels, pcomponents, (2,) + shape, wcs)()
-hM = M.MixingMatrix(hchannels, hcomponents, (2,) + T_d.shape, wcs)()
+pM = M.MixingMatrix(pchannels, pcomponents, (2,) + shape, wcs=wcs)()
+hM = M.MixingMatrix(hchannels, hcomponents, (2,) + T_d.shape, wcs=wcs)()
 
 print(ha.shape, hM.shape)
 print(pa.shape, pM.shape)
@@ -113,7 +117,6 @@ for j, channel in enumerate(hchannels):
         plt.savefig(fig_path + f'{instr}_{band}_{pol}_{notes}reldiff_healpix.png')
         plt.close()
         utils.eplot(100*((prmaps - ppmaps)/prmaps)[j,a], colorbar=True, grid=False, fname=fig_path + f'{instr}_{band}_{pol}_{notes}reldiff')
-
 
 for j, channel in enumerate(hchannels):
     for a in range(2):

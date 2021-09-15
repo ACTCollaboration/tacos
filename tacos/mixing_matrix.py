@@ -94,7 +94,7 @@ class Component:
         comp_block = config['components'][name]
 
         # get pixelization
-        healpix  =params_block['healpix']
+        healpix = params_block['healpix']
 
         # first get the model of the component
         model_name = comp_block['model']

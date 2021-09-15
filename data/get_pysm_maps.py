@@ -13,14 +13,16 @@ from tacos.bandpass import BandPass
 import numpy as np
 
 import argparse
-parser = argparse.ArgumentParser('Generate pysm maps at each band in this project. \
-    Default behavior of iau behavior argument may flip later.')
+parser = argparse.ArgumentParser('Generate pysm maps at each band in this project. ' +
+    'Default behavior of iau behavior argument may flip later.')
 parser.add_argument('--raw-is-iau', dest='raw_is_iau', default=False, action='store_true',
     help='If passed, assume raw data already in IAU convention. Default is False: multiply U by -1')
 parser.add_argument('--odtype', dest='odtype', type=str, default='f4', help='Numpy dtype str to apply to written products.')
-parser.add_argument('--notes', dest='notes', type=str, default='', help='Notes to append to map names')
+parser.add_argument('--notes', dest='notes', type=str, default='', help='Notes to append to map names. ' +
+                    'If notes not passed and tophat is passed, note will be "tophat"')
 parser.add_argument('--tophat', dest='tophat', default=False, action='store_true', 
-    help='If passed, make tophat pysm maps. Default is False: use the full corresponding instrument band')
+    help='If passed, make tophat pysm maps. Default is False: use the full corresponding instrument band. ' + 
+    'If notes not passed and tophat is passed, note will be "tophat"')
 args = parser.parse_args()
 
 # get some basics

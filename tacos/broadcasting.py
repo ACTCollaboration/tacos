@@ -7,17 +7,6 @@ from tacos import utils
 from pixell import enmap
 import healpy as hp 
 
-def simple_upgrade(arr, factor=1, healpix=False):
-    if healpix:
-        nside_in = hp.npix2nside(arr.shape[-1])
-        nside_out = factor * nside_in
-        arr = hp.ud_grade(arr, nside_out)
-    else:
-        # enmap upgrade needs a wcs
-        arr = enmap.enmap(arr, copy=False) # copying is slow!
-        arr = enmap.upgrade(arr, factor)
-    return np.asarray(arr)
-
 def P_to_QU(arr, axis=0, healpix=False):
     if healpix:
         arr = utils.atleast_nd(arr, 2, axis=axis)
@@ -30,6 +19,17 @@ def P_to_QU(arr, axis=0, healpix=False):
         return np.repeat(arr, [1, 2], axis=axis)
     else:
         raise ValueError(f'Axis {axis} length must be 1 or 2; is {arr.shape[axis]}')
+
+def simple_upgrade(arr, factor=1, healpix=False):
+    if healpix:
+        nside_in = hp.npix2nside(arr.shape[-1])
+        nside_out = factor * nside_in
+        arr = hp.ud_grade(arr, nside_out)
+    else:
+        # enmap upgrade needs a wcs
+        arr = enmap.enmap(arr, copy=False) # copying is slow!
+        arr = enmap.upgrade(arr, factor)
+    return np.asarray(arr)
 
 def simple_downgrade(arr, factor=1, op=np.mean, healpix=False):
     if healpix:
