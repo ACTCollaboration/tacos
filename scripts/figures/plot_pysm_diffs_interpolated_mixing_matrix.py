@@ -1,4 +1,4 @@
-from tacos import utils, data, models, sampling, mixing_matrix as M
+from tacos import utils, data, models, mixing_matrix as M
 from pixell import enmap, reproject
 import healpy as hp
 import matplotlib
@@ -79,7 +79,7 @@ a_d_car = reproject.enmap_from_healpix(a_d, shape, wcs, ncomp=3, rot=None)
 pa = np.array([a_s_car, a_d_car])[:, 1:, ...]
 
 pM = M.MixingMatrix(pchannels, pcomponents, (2,) + shape, wcs=wcs)()
-hM = M.MixingMatrix(hchannels, hcomponents, (2,) + T_d.shape, wcs=wcs)()
+hM = M.MixingMatrix(hchannels, hcomponents, (2,) + T_d.shape)()
 
 print(ha.shape, hM.shape)
 print(pa.shape, pM.shape)

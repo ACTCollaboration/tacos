@@ -362,7 +362,7 @@ class MixingMatrix:
             for chanidx, element in enumerate(self._elements[comp_name]):
                 self._matrix[chanidx, compidx] = element(**active_params)
 
-        return self._matrix
+        return self.matrix
 
     @classmethod
     def load_from_config(cls, config_path, verbose=True):
@@ -406,7 +406,7 @@ def _load_all_from_config(config_path, load_channels=True, load_components=True,
     name = os.path.basename(config_base)
     return name, channels, components, polstr, shape, wcs, kwargs
 
-def get_mixing_matrix(channels, components, dtype=np.float32):
+def get_exact_mixing_matrix(channels, components, shape, wcs=None, dtype=np.float32):
     '''
     Return mixing matrix for given frequency bands and signal
     components.
@@ -429,14 +429,7 @@ def get_mixing_matrix(channels, components, dtype=np.float32):
     nchan = len(channels)
     ncomp = len(components)
 
-    if hasattr(channels[0].map, 'wcs'):
-        is_enmap = True
-        wcs = channels[0].map.wcs
-    else:
-        is_enmap = False
-
-    m_shape = (nchan, ncomp) + channels[0].map.shape
-    m = np.zeros(m_shape, dtype=dtype)
+    m = np.zeros((nchan, ncomp, *shape), dtype=dtype)
 
     for chanidx, chan in enumerate(channels):
         u_conv = chan.bandpass.rj_to_cmb
@@ -444,7 +437,7 @@ def get_mixing_matrix(channels, components, dtype=np.float32):
             res = u_conv * chan.bandpass.integrate_signal(comp)
             m[chanidx, compidx] = res
 
-    if is_enmap:
+    if wcs:
         m = enmap.ndmap(m, wcs)
 
     return m
