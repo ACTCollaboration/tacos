@@ -18,6 +18,7 @@ class Chain:
     def __init__(self, components, shape, wcs=None, dtype=np.float32, name=None):
         
         ncomp = len(components)
+        self._components = components
 
         self._shape = shape
         utils.check_shape(self._shape)
@@ -73,7 +74,8 @@ class Chain:
 
     def add_weights(self, weights, method='append'):
         weights = np.asarray(weights, dtype=self._dtype)
-        assert weights.shape == self._weights_shape, \
+        ndim = len(self._weights_shape)
+        assert weights.shape[-ndim:] == self._weights_shape, \
             f'Attempted to add weights with shape {weights.shape}; expected {self._weights_shape}'
         if method == 'append':
             self._weights.append(weights)
@@ -96,7 +98,8 @@ class Chain:
             amplitudes = enmap.enmap(amplitudes, self._wcs, dtype=self._dtype, copy=False)
         else:
             amplitudes = np.asarray(amplitudes, dtype=self._dtype)
-        assert amplitudes.shape == self._amplitudes_shape, \
+        ndim = len(self._amplitudes_shape)
+        assert amplitudes.shape[-ndim:] == self._amplitudes_shape, \
             f'Attempted to add amplitudes with shape {amplitudes.shape}; expected {self._amplitudes_shape}'
         if method == 'append':
             self._amplitudes.append(amplitudes)
@@ -116,13 +119,14 @@ class Chain:
 
     def add_params(self, comp_name, param_name, params, method='append'):
         params = np.asarray(params, dtype=self._dtype)
-        assert params.shape == self._params_shape[comp_name][param_name], \
+        ndim = len(self._params_shape[comp_name][param_name])
+        assert params.shape[-ndim:] == self._params_shape[comp_name][param_name], \
             f'Attempted to append {comp_name} param {param_name} with shape {params.shape}; expected {self._params_shape[comp_name][param_name]}'
         if method == 'append':
             self._params[comp_name][param_name].append(params)
             self._check_lengths()
         else:
-            warnings.warn('Overwriting amplitudes; not performing lengths checking')
+            warnings.warn('Overwriting params; not performing lengths checking')
             self._params[comp_name][param_name] = params
 
     def get_params(self, iteration=-1):
