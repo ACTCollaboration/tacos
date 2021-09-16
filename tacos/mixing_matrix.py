@@ -58,7 +58,7 @@ class Component:
             elif param in self.active_params:
                 self.broadcasters[param] = param_broadcasters[param]
 
-        # store shape for passing onto Params class, but it doesn't do anything here
+        # store shape for passing onto Chain class, but it doesn't do anything here
         if shapes is None:
             shapes = {}
         for param, shape in shapes.items():
@@ -146,9 +146,7 @@ class Component:
                     if verbose:
                         print(f'Fixing component {comp_name} (model {model_name}) param {param} to {value} template')
                     if healpix:
-                        value_base, value_ext = os.path.splitext(value)
-                        value_base += '_healpix'
-                        value = value_base + value_ext
+                        value += '_healpix'
                         value = hp.read_map(config['templates'][value], field=None, dtype=np.float32)
                     else:
                         value = enmap.read_map(config['templates'][value])
@@ -156,9 +154,9 @@ class Component:
                     if verbose:
                         print(f'Fixing component {comp_name} (model {model_name}) param {param} to data at {value}')
                     if healpix:
-                        value = hp.read_map(config['templates'][value], field=None, dtype=np.float32)
+                        value = hp.read_map(value, field=None, dtype=np.float32)
                     else:
-                        value = enmap.read_map(config['templates'][value])
+                        value = enmap.read_map(value)
             
             # add it to the mapping we are building
             kwargs[param] = value

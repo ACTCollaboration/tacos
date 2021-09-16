@@ -15,125 +15,145 @@ class Chain:
         name, _, components, _, shape, wcs, kwargs = M._load_all_from_config(config_path, load_channels=False, verbose=verbose)
         return cls(components, shape, wcs, name=name, **kwargs)
 
-    def __init__(self, components, shape, wcs=None, dtype=np.float32, name=None):
+    def __init__(self, components, shape, wcs=None, dtype=np.float32, name=None,
+                    max_N=1000, fname=None, overwrite=False):
         
         ncomp = len(components)
         self._components = components
-
         self._shape = shape
         utils.check_shape(self._shape)
-        
         self._wcs = wcs # if this is None, return array as-is (ie, healpix), see amplitudes property
         self._dtype = dtype
-        self._name = name
+        self._name = name # used for writing to disk if fname not provided
+        self._max_N = max_N # maximum array size. once reached, chain is dumped
+        self._N = 0 # current sample counter
+        self._fname = self._get_fname(fname, name) # used for autodumping
+        self._overwrite = overwrite # used for autodumping
 
         # initialize chain info, this is just weights and -2logposts
-        self._weights = []
-        self._weights_shape = (2,)
+        self._weights = np.empty((max_N, 2), dtype=dtype)
 
         # initialize amplitudes
         # amplitudes are a single array, with outermost axis for components
-        self._amplitudes = []
-        self._amplitudes_shape = (ncomp,) + self.shape
+        if wcs is None:
+            self._amplitudes = np.empty((max_N, ncomp, *self.shape), dtype=dtype)
+        else:
+            self._amplitudes = enmap.empty((max_N, ncomp, *self.shape), wcs=wcs, dtype=dtype)
 
         # for each component with active parameters, store parameters separately.
-        # store shapes in a similar structure
         self._params = {}
-        self._params_shape = {}
+        self._paramsidx = [] # for iterating over 
         for comp in components:
-            assert comp.name not in self._params and comp.name not in self._params_shape, \
-                f'Component {comp} has repeated name'
+            assert comp.name not in self._params, f'Component {comp} has repeated name'
             self._params[comp.name] = {}
-            self._params_shape[comp.name] = {}
             for active_param in comp.active_params:
                 if active_param in comp.shapes:
                     shape = comp.shapes[active_param]
                 else:
                     shape = self.shape
-                self._params[comp.name][active_param] = []
-                self._params_shape[comp.name][active_param] = shape
+                self._params[comp.name][active_param] = np.empty((max_N, *shape), dtype=dtype)
+                self._paramsidx.append((comp.name, active_param))
 
         assert len(self._params) == ncomp, \
             'At least one component has a repeated name, this is not allowed'
-        self._check_lengths()
 
-    def _check_lengths(self, delta_length=1):
-        # we want to make sure no chain is more than delta_length longer than any other.
-        # you probably want delta_length=1 when updating parameters, and delta_length=0
-        # when writing to disk
-        lengths = np.array(self._get_lengths())
-        diff = lengths.max() - lengths.min()
-        assert diff <= delta_length, \
-            f'The max. diff. in num. of iterations between chain objects is {diff}; expected {delta_length}'
+    def get_empty_params_sample(self):
+        d = {}
+        for comp_name, active_params in self._params.items():
+            d[comp_name] = {}
+            for param_name in active_params.keys():
+                d[comp_name][param_name] = None
 
-    def _get_lengths(self):
-        lengths = (len(self._weights), len(self._amplitudes))
-        for active_params in self._params.values(): # active_params is a dict
-            lengths += tuple(len(param) for param in active_params.values())
-        return lengths
+    def paramsidx(self):
+        for i in self._paramsidx:
+            yield i
 
-    def add_weights(self, weights, method='append'):
+    def _get_fname(self, fname, name):
+        # allow the chain name to be the filename
+        if fname is None and name is not None:
+            fname = config['output']['chain_path'] + name + '.fits'
+            return fname
+        else:
+            raise ValueError('Chain has no name; must supply explicit filename to dump to')
+
+    def add_sample(self, weights=None, amplitudes=None, params=None):
+        if self._N > 0:
+            prev_weights, prev_amplitudes, prev_params = self.get_sample()
+        
+        # copy forward the previous sample. this will fail if counter at 0
+        if weights is None:
+            weights = prev_weights
+        if amplitudes is None:
+            amplitudes = prev_amplitudes
+        if params is None:
+            params = prev_params
+
+        # add sample and increment counter
+        self._add_weights(weights)
+        self._add_amplitudes(amplitudes)
+
+        # iterate over internal components, active_params to enforce that 
+        # kwarg params has supplied all of them
+        for comp_name, active_params in self._params.items():
+            for param_name in active_params:
+                self._add_params(comp_name, param_name, params[comp_name][param_name])
+        self._N += 1
+
+        # if counter reaches max, dump
+        warnings.warn(f'Sample counter reached max of {self._max_N}; writing to {self._fname} and reseting')
+
+    def get_sample(self, iteration=-1):
+        sel = np.s_[iteration % self._N]
+        return (
+            self._weights[sel], self._amplitudes[sel], self._get_params(sel)
+        )
+
+    def _get_params(self, sel=None):
+        if sel is None:
+            sel = np.s_[-1 % self._N]
+        return {
+            comp_name: {
+                param_name: 
+                    self._params[comp_name][param_name][sel] for param_name in active_params
+                } for comp_name, active_params in self._params.items()
+            }
+
+    def _add_weights(self, weights):
         weights = np.asarray(weights, dtype=self._dtype)
-        ndim = len(self._weights_shape)
-        assert weights.shape[-ndim:] == self._weights_shape, \
-            f'Attempted to add weights with shape {weights.shape}; expected {self._weights_shape}'
-        if method == 'append':
-            self._weights.append(weights)
-            self._check_lengths()
-        elif method == 'overwrite':
-            warnings.warn('Overwriting weights; not performing lengths checking')
-            self._weights = weights
+        assert weights.shape == self._weights.shape[1:], \
+        f'Attempted to add weights with shape {weights.shape}; expected {self._weights.shape[1:]}'
+        self._weights[self._N] = weights
 
-    def get_weights(self, iteration=-1):
-        return self._weights[iteration]
-
-    def get_all_weights(self):
-        return np.asarray(self._weights, dtype=self._dtype)
-
-    def add_amplitudes(self, amplitudes, method='append'):
+    def _add_amplitudes(self, amplitudes):
         if self._wcs is not None:
             if hasattr(amplitudes, 'wcs'):
                 assert wcsutils.is_compatible(self._wcs, amplitudes.wcs), \
-                    'Attempted to add amplitudes with incompatible wcs to this wcs'
+                    'Attempted to add amplitudes with incompatible wcs to wcs of Chain'
             amplitudes = enmap.enmap(amplitudes, self._wcs, dtype=self._dtype, copy=False)
         else:
             amplitudes = np.asarray(amplitudes, dtype=self._dtype)
-        ndim = len(self._amplitudes_shape)
-        assert amplitudes.shape[-ndim:] == self._amplitudes_shape, \
-            f'Attempted to add amplitudes with shape {amplitudes.shape}; expected {self._amplitudes_shape}'
-        if method == 'append':
-            self._amplitudes.append(amplitudes)
-            self._check_lengths()
-        elif method == 'overwrite':
-            warnings.warn('Overwriting amplitudes; not performing lengths checking')
-            self._amplitudes = amplitudes
-
-    def get_amplitudes(self, iteration=-1):
-        return self._amplitudes[iteration]
+        assert amplitudes.shape == self._amplitudes.shape[1:], \
+            f'Attempted to add amplitudes with shape {amplitudes.shape}; expected {self._amplitudes.shape[1:]}'
+        self._amplitudes[self._N] = amplitudes
+    
+    def _add_params(self, comp_name, param_name, params):
+        params = np.asarray(params, dtype=self._dtype)
+        assert params.shape == self._params[comp_name][param_name].shape[1:], \
+            f'Attempted to append {comp_name} param {param_name} with shape {params.shape}; ' + \
+                f'expected {self._params[comp_name][param_name].shape[1:]}'
+        self._params[comp_name][param_name][self._N] = params
+       
+    def get_all_samples(self):
+        pass
+    
+    def get_all_weights(self):
+        return np.asarray(self._weights, dtype=self._dtype)
 
     def get_all_amplitudes(self):
         if self._wcs is None:
             return np.asarray(self._amplitudes, dtype=self._dtype)
         else:
             return enmap.enmap(self._amplitudes, self._wcs, dtype=self._dtype, copy=False)
-
-    def add_params(self, comp_name, param_name, params, method='append'):
-        params = np.asarray(params, dtype=self._dtype)
-        ndim = len(self._params_shape[comp_name][param_name])
-        assert params.shape[-ndim:] == self._params_shape[comp_name][param_name], \
-            f'Attempted to append {comp_name} param {param_name} with shape {params.shape}; expected {self._params_shape[comp_name][param_name]}'
-        if method == 'append':
-            self._params[comp_name][param_name].append(params)
-            self._check_lengths()
-        else:
-            warnings.warn('Overwriting params; not performing lengths checking')
-            self._params[comp_name][param_name] = params
-
-    def get_params(self, iteration=-1):
-        return {
-            comp_name: {
-            param_name: self._params[comp_name][param_name][iteration] for param_name in active_params
-            } for comp_name, active_params in self._params.items()}
 
     def get_all_params(self):
         out = {}
@@ -147,10 +167,7 @@ class Chain:
         self._check_lengths(delta_length=0) # can only dump a complete chain
 
         # allow the chain name to be the filename
-        if fname is None and self._name is not None:
-            fname = config['output']['chain_path'] + self._name + '.fits'
-        else:
-            raise ValueError('Chain has no name; must supply explicit filename to dump to')
+        fname = self._get_fname(fname, self._name)
 
         # first make the primary hdu. this will hold information informing us what the latter hdus are,
         # which is always amplitudes, followed be each active param.
