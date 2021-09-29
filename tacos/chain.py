@@ -79,6 +79,9 @@ class Chain:
         return d
 
     def add_samples(self, weights=None, amplitudes=None, params=None):
+        assert not(weights is None and amplitudes is None and params is None), \
+            'All of weights, amplitudes, and params passed as None'
+
         if self._N > 0:
             prev_weights, prev_amplitudes, prev_params = self.get_samples()
         
@@ -147,15 +150,31 @@ class Chain:
                 f'{comp} param {param} contains a non-finite entry'
 
     def _get_sample_length(self, weights, amplitudes, params):
-        equal_lengths = True
-        equal_lengths &= len(weights) == len(amplitudes)
+        max_length = len(weights) # this is 1 or N
 
+        # check that len(amplitudes) is 1 or N
+        if len(amplitudes) > max_length:
+            assert max_length == 1, \
+                'Weights and amplitudes have >1 sample and different number of samples'
+            max_length = len(amplitudes)
+        elif len(amplitudes) < max_length:
+            assert len(amplitudes) == 1, \
+                'Weights and amplitudes have >1 sample and different number of samples'
+
+        # check that len(each param) is 1 or N
         # NOTE: if no active params, this loop does nothing
         for comp, param in self.paramsiter():
-            equal_lengths &= len(weights) == len(params[comp][param])
+            if len(params[comp][param]) > max_length:
+                assert max_length == 1, \
+                    f'Comp {comp} param {param} have >1 sample and different number of samples ' + \
+                    'than either weights, amplitudes, or a previous param'
+                max_length = len(params[comp][param])
+            elif len(params[comp][param]) < max_length:
+                assert len(params[comp][param]) == 1, \
+                    f'Comp {comp} param {param} have >1 sample and different number of samples ' + \
+                    'than either weights, amplitudes, or a previous param'
 
-        assert equal_lengths, 'Not all of weights, amplitudes, params have an equal number of samples'
-        return len(weights)
+        return max_length
 
     def _add_weights(self, weights, delta_N):
         weights = np.asarray(weights, dtype=self._dtype)
