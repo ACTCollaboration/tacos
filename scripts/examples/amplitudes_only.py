@@ -100,11 +100,11 @@ def chi2_per_pix(amp_samps, mean=c):
 # now let's sample! this is pretty simple
 for i in tqdm(range(num_steps)):
     np.random.seed(tuple((0, i)))
-    eta_d = np.random.randn(*(nchan, npol, *shape))
+    eta_d = np.random.randn(*(nchan, npol, *shape), dtype=np.float32)
     MN_halfinveta_d = np.einsum('jcab...,jb...->ca...', MN_halfinv, eta_d)
 
     np.random.seed(tuple((1, i)))
-    eta_m = np.random.randn(*(ncomp, npol, *shape))
+    eta_m = np.random.randn(*(ncomp, npol, *shape), dtype=np.float32)
     S_halfinveta_s = np.einsum('cadb...,ca...->db...', S_halfinv, eta_m)
 
     # solve for our sample
@@ -113,7 +113,6 @@ for i in tqdm(range(num_steps)):
     weight = [1, chi2_per_pix(x).mean()]
 
     # update the chain
-    chain.add_weights(weight)
-    chain.add_amplitudes(x)
+    chain.add_samples(weights=weight, amplitudes=x)
 
-chain.write_samples()
+chain.write_samples(overwrite=True)

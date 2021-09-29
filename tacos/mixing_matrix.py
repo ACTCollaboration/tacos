@@ -1,5 +1,4 @@
 import numpy as np
-from numpy.matrixlib.defmatrix import matrix
 from scipy import interpolate as interp
 from ast import literal_eval
 import os
@@ -7,7 +6,7 @@ import os
 from pixell import enmap
 import healpy as hp 
 
-from tacos import data, utils, models, broadcasting
+from tacos import data, utils, models, broadcasting, config
 
 config = utils.config_from_yaml_resource('configs/mixing_matrix.yaml')
 

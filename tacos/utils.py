@@ -1,9 +1,7 @@
 # helper utility functions
-from multiprocessing import Value
 from pixell import enmap, enplot, curvedsky, utils
 import healpy as hp 
 import camb
-
 import numpy as np
 import yaml
 
@@ -260,7 +258,7 @@ def atleast_nd(arr, n, axis=None):
     """
     arr = np.asanyarray(arr)
     if (axis is None) or (arr.ndim >= n):
-        oaxis=tuple(range(n - arr.ndim)) # prepend the dims or do nothing if n <= arr.ndim
+        oaxis = tuple(range(n - arr.ndim)) # prepend the dims or do nothing if n <= arr.ndim
     else:
         axis = np.atleast_1d(axis)
         assert (n - arr.ndim) >= len(axis), 'More axes than dimensions to add'
