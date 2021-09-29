@@ -18,7 +18,8 @@ method_order_key = {
 
 class Component:
 
-    def __init__(self, model, name=None, comp_broadcaster=None, param_broadcasters=None, shapes=None, verbose=True, **kwargs):
+    def __init__(self, model, name=None, comp_broadcaster=None, param_broadcasters=None, shapes=None,
+                    verbose=True, **kwargs):
         
         self._model = model
         self._name = name if name else model.__class__.__name__.lower()
@@ -52,10 +53,13 @@ class Component:
         for param in param_broadcasters:
             if param in self.fixed_params:
                 if verbose: 
-                    print(f'Broadcasting fixed param {param} and overwriting its value to broadcasted result')
+                    print(f'Broadcasting fixed param {param} and overwriting its value to ' + \
+                        'broadcasted result')
                 self.fixed_params[param] = param_broadcasters[param](self.fixed_params[param])
             elif param in self.active_params:
                 self.broadcasters[param] = param_broadcasters[param]
+            else:
+                raise ValueError(f'Param {param} not in fixed nor active params')
 
         # store shape for passing onto Chain class, but it doesn't do anything here
         if shapes is None:
@@ -65,7 +69,8 @@ class Component:
                 self.shapes[param] = shape
 
     # This function oddly has no use when things are interpolated
-    # I think it will come in handy when evaluating a proposal that has gone "out of bounds" TODO: implement that
+    # I think it will come in handy when evaluating a proposal that has gone "out of bounds"
+    # TODO: implement that
     def __call__(self, nu, **kwargs):
         
         # first broadcast active params

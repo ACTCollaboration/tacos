@@ -1,10 +1,11 @@
 from pixell import enmap, wcsutils
-from astropy.io import fits
+import h5py
 import numpy as np
 
 from tacos import utils, mixing_matrix as M
 
 import warnings
+import os
 
 config = utils.config_from_yaml_resource('configs/sampling.yaml')
 
@@ -15,8 +16,7 @@ class Chain:
         name, _, components, _, shape, wcs, kwargs = M._load_all_from_config(config_path, load_channels=False, verbose=verbose)
         return cls(components, shape, wcs, name=name, **kwargs)
 
-    def __init__(self, components, shape, wcs=None, dtype=np.float32, name=None,
-                    max_N=1000, fname=None):
+    def __init__(self, components, shape, wcs=None, dtype=np.float32, fname=None, name=None, max_N=1000):
         
         ncomp = len(components)
         self._components = components
@@ -24,44 +24,49 @@ class Chain:
         utils.check_shape(self._shape)
         self._wcs = wcs # if this is None, return array as-is (ie, healpix), see amplitudes property
         self._dtype = dtype
+        self._fname = self._get_fname(fname=fname, name=name)
         self._name = name # used for writing to disk if fname not provided
         self._max_N = max_N # maximum array size. once reached, chain is dumped
         self._N = 0 # current sample counter
-        self._fname = self._get_fname(fname, name) # used for autodumping
 
         # initialize chain info, this is just weights and -2logposts
-        self._weights = np.empty((max_N, 2), dtype=dtype)
+        self._weights = np.full((max_N, 2), np.nan, dtype=dtype)
 
         # initialize amplitudes
         # amplitudes are a single array, with outermost axis for components
-        if wcs is None:
-            self._amplitudes = np.empty((max_N, ncomp, *self.shape), dtype=dtype)
-        else:
-            self._amplitudes = enmap.empty((max_N, ncomp, *self.shape), wcs=wcs, dtype=dtype)
+        self._amplitudes = np.full((max_N, ncomp, *self.shape), np.nan, dtype=dtype)
+        if wcs is not None:
+            self._amplitudes = enmap.enmap(self._amplitudes, wcs=wcs, dtype=dtype, copy=False)
 
         # for each component with active parameters, store parameters separately.
         self._params = self.get_empty_params_sample()
-        for comp, param in self.paramsiter():
+        for comp, param in self.paramsiter(yield_component=True):
             if param in comp.shapes:
                 shape = comp.shapes[param]
             else:
                 shape = self.shape
-            self._params[comp][param] = np.empty((max_N, *shape), dtype=dtype)
+            self._params[comp.name][param] = np.full((max_N, *shape), np.nan, dtype=dtype)
 
-    def _get_fname(self, fname, name):
+    def _get_fname(self, fname=None, name=None):
         # allow the chain name to be the filename
         if fname is not None:
             return fname
         elif name is not None:
-            fname = config['output']['chain_path'] + name + '.fits'
+            fname = config['output']['chain_path']
+            if name[-5:] != '.hdf5':
+                name += '.hdf5'
+            fname += name
             return fname
         else:
-            raise ValueError('Chain has no name; must supply explicit filename to dump to')
+            raise ValueError('Chain has no name; must supply fullpath filename to dump to')
 
-    def paramsiter(self):
+    def paramsiter(self, yield_component=False):
         for comp in self._components:
             for param in comp.active_params:
-                yield comp.name, param
+                if yield_component:
+                    yield comp, param
+                else:
+                    yield comp.name, param
 
     def get_empty_params_sample(self):
         d = {}
@@ -94,39 +99,35 @@ class Chain:
                 params[comp][param], self._params[comp][param].ndim
                 )
 
-        # check all samples have the same length and that we can store the number of samples 
-        # in this Chain. If so, check if we can add samples given current counter. If so, add
-        # them. If not, or if after adding them we reach max counter, then dump.
+        # (1) check all samples are finite
+        # (2) check all samples have the same length and that we can store the number of samples 
+        # in this Chain.
+        # (3) check if we can add samples given current counter.
+        # (3a) If so, add them.
+        # (3b) If not, or if after adding them we reach max counter, then dump.
+        self._check_samples(weights, amplitudes, params)
         delta_N = self._get_sample_length(weights, amplitudes, params)
         assert delta_N <= self._max_N, 'Cannot add more samples than this Chain can ever hold'
         
         if self._N + delta_N <= self._max_N:      
-
-            # add sample and increment counter
             self._add_weights(weights, delta_N)
             self._add_amplitudes(amplitudes, delta_N)
-
-            # iterate over internal components, active_params to enforce that 
-            # kwarg params has supplied all of them
             for comp, param in self.paramsiter():
                 self._add_params(comp, param, params[comp][param], delta_N)
-            
-            # if counter reaches max, dump
+                        
             self._N += delta_N
-
-            # TODO: fix overwrite = Trues!!!!
             if self._N == self._max_N:
                 warnings.warn(f'Sample counter reached max of {self._max_N}; writing to {self._fname} and reseting')
-                self.write_samples(overwrite=True, reset=True)
+                self.write_samples(overwrite=False, reset=True)
         else:
             warnings.warn(f'Sample counter would reach max of {self._max_N} if samples added; ' + \
-                f'writing to {self._fname}, reseting, and then adding samples')
-            self.write_samples(overwrite=True, reset=True)
-            self.add_sample(weights=weights, amplitudes=amplitudes, params=params)
+                f'writing to {self._fname} first, reseting, and then adding samples')
+            self.write_samples(overwrite=False, reset=True)
+            self.add_samples(weights=weights, amplitudes=amplitudes, params=params)
 
     def get_samples(self, sel=None):
         if sel is None:
-            assert self._N > 0
+            assert self._N > 0, 'Cannot get samples from empty chain'
             sel = np.s_[-1 % self._N] # get most recent *written* element
         return (
             self._weights[sel], self._amplitudes[sel], self._get_params(sel)
@@ -137,6 +138,13 @@ class Chain:
         for comp, param in self.paramsiter():
             d[comp][param] = self._params[comp][param][sel]
         return d 
+
+    def _check_samples(self, weights, amplitudes, params):
+        assert np.isfinite(weights).sum() == weights.size, 'Weights contains a non-finite entry'
+        assert np.isfinite(amplitudes).sum() == amplitudes.size, 'Amplitudes contains a non-finite entry'
+        for comp, param in self.paramsiter():
+            assert np.isfinite(params[comp][param]).sum() == params[comp][param].size, \
+                f'{comp} param {param} contains a non-finite entry'
 
     def _get_sample_length(self, weights, amplitudes, params):
         equal_lengths = True
@@ -174,83 +182,86 @@ class Chain:
                 f'expected {self._params[comp_name][param_name].shape[1:]}'
         self._params[comp_name][param_name][self._N:self._N + delta_N] = params
 
-    def write_samples(self, fname=None, overwrite=True, reset=False):
-        # allow the chain name to be the filename
-        if fname is None:
+    def write_samples(self, fname=None, name=None, overwrite=False, reset=False):
+        # allow the chain name to be the filename. fname (fullpath) takes
+        # precedence over name
+        if fname is None and name is None:
             fname = self._fname
+        else:
+            fname = self._get_fname(fname, name)
 
         # get all the samples
         weights, amplitudes, params = self.get_samples(sel=np.s_[:self._N])
 
-        # first make the primary hdu. this will hold information informing us what the latter hdus are,
-        # which is always amplitudes, followed be each active param.
-        # the primary hdu itself holds the weights
-        primary_hdr = fits.Header()
-        primary_hdr['HDU1'] = 'AMPLITUDES'
+        if overwrite or not os.path.exists(fname):
+            with h5py.File(fname, 'w') as hfile:
+                # put all the samples in a 'samples' group, in case there is metadata to attach later
+                # that is not specific to either the weights, amplitudes, or params
+                hgroup = hfile.create_group('samples')
 
-        hidx = 2
-        for comp, param in self.paramsiter():
-            primary_hdr[f'HDU{hidx}'] = f'{comp}_{param}'.upper()
-            hidx += 1
-
-        primary_hdu = fits.PrimaryHDU(data=weights, header=primary_hdr)
-
-        # next make the amplitude and params hdus. there is always an amplitude hdu (hdu 1)
-        # but not always params (only if active params)
-        if self._wcs is not None:
-            amplitudes_hdr = self._wcs.to_header(relax=True) # if there is wcs information, retain it
+                # create new datasets with 1 chunk per sample and unlimited future samples
+                hgroup.create_dataset(
+                    'weights', data=weights,
+                    chunks=(1, *weights.shape[1:]), maxshape=(None, *weights.shape[1:])
+                    )
+                hgroup.create_dataset(
+                    'amplitudes', data=amplitudes,
+                    chunks=(1, *amplitudes.shape[1:]), maxshape=(None, *amplitudes.shape[1:])
+                    )
+                for comp, param in self.paramsiter():
+                    hgroup.create_dataset(
+                        f'params/{comp}/{param}', data=params[comp][param],
+                        chunks=(1, *params[comp][param].shape[1:]), maxshape=(None, *params[comp][param].shape[1:])
+                        )
         else:
-            amplitudes_hdr = fits.Header()
-        amplitudes_hdu = fits.ImageHDU(data=amplitudes, header=amplitudes_hdr)
-        hdul = fits.HDUList([primary_hdu, amplitudes_hdu])
+            with h5py.File(fname, 'r+') as hfile:
+                # resize all the datasets by the number of samples we are adding
+                weights_dset = hfile['samples/weights']
+                weights_dset.resize(weights_dset.shape[0] + self._N, axis=0)
 
-        for comp, param in self.paramsiter():
-            hdul.append(fits.ImageHDU(data=params[comp][param]))
-        
-        # finally, write to disk and "reset" the chain to be empty
-        # TODO: implement appending to the file, instead of overwriting it
-        if overwrite:
-            warnings.warn(f'Overwriting samples at {fname}')
-            hdul.writeto(fname, overwrite=overwrite)
-        else:
-            raise NotImplementedError('Appending to disk not yet implemented')
+                amplitudes_dset = hfile['samples/amplitudes']
+                amplitudes_dset.resize(amplitudes_dset.shape[0] + self._N, axis=0)
+
+                params_dset = self.get_empty_params_sample()
+                for comp, param in self.paramsiter():
+                    params_dset[comp][param] = hfile[f'samples/params/{comp}/{param}']
+                    params_dset[comp][param].resize(params_dset[comp][param].shape[0] + self._N, axis=0)
+
+                # add samples to datasets
+                weights_dset.write_direct(weights, dest_sel=np.s_[-self._N:])
+                amplitudes_dset.write_direct(amplitudes, dest_sel=np.s_[-self._N:])
+                for comp, param in self.paramsiter():
+                    params_dset[comp][param].write_direct(params[comp][param], dest_sel=np.s_[-self._N:])
+
         if reset:
-            self.__init__(self._components, self._shape, wcs=self._wcs, dtype=self._dtype, name=self._name,
-                        max_N=self._max_N, fname=self._fname)
+            self.__init__(
+                self._components, self._shape, wcs=self._wcs, dtype=self._dtype,
+                fname=self._fname, name=self._name, max_N=self._max_N
+                )
 
-    def read_samples(self, fname=None):
-
-        # allow the chain name to be the filename
-        if fname is None:
+    def read_samples(self, fname=None, name=None):
+        # allow the chain name to be the filename. fname (fullpath) takes
+        # precedence over name
+        if fname is None and name is None:
             fname = self._fname
+        else:
+            fname = self._get_fname(fname, name)
 
-        with fits.open(fname) as hdul:
+        # currently this reads all sampls
+        with h5py.File(fname, 'r') as hfile:
+            weights_dset = hfile['samples/weights']
+            weights = np.empty(weights_dset.shape, weights_dset.dtype)
+            weights_dset.read_direct(weights)
 
-            # get the primary hdu header, which refers to the subsequent hdus
-            header = hdul[0].header
+            amplitudes_dset = hfile['samples/amplitudes']
+            amplitudes = np.empty(amplitudes_dset.shape, amplitudes_dset.dtype)
+            amplitudes_dset.read_direct(amplitudes)
 
-            # get the weights from the primary hdu
-            weights = hdul[0].data
-
-            # get the amplitudes from the 1st image hdu 
-            assert header['HDU1'] == 'AMPLITUDES', 'HDU1 must hold AMPLITUDES'
-            amplitudes = hdul[1].data
-
-            # assign subsequent hdus to active params
             params = self.get_empty_params_sample()
-            for hidx, (comp, param) in enumerate(self.paramsiter()):
-                # we start from hidx = 2
-                hidx += 2
-            
-                # check that the comp, params order on disk matches that of this Chain object
-                comp_on_disk, param_on_disk = header[f'HDU{hidx}'].split('_')
-                assert comp.upper() == comp_on_disk, \
-                    'Chain loaded from config has different comp order than chain on disk'
-                assert param.upper() == param_on_disk, \
-                    'Chain loaded from config has different param order than chain on disk'
-
-                # get the param from this hdu
-                params[comp][param] = hdul[hidx].data
+            for comp, param in self.paramsiter():
+                params_dset = hfile[f'samples/params/{comp}/{param}']
+                params[comp][param] = np.empty(params_dset.shape, params_dset.dtype)
+                params_dset.read_direct(params[comp][param])
         
         self.add_samples(weights=weights, amplitudes=amplitudes, params=params)
 

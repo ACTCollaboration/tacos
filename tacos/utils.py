@@ -1,5 +1,5 @@
 # helper utility functions
-from pixell import enmap, enplot, curvedsky, utils
+from pixell import enmap, curvedsky, utils
 import healpy as hp 
 import camb
 import numpy as np
@@ -86,6 +86,7 @@ def parse_parameters_block(params_block, verbose=True):
     Some keys in params_block are optional. These are:
 
         dtype : string formatter for numpy datatype
+        max_N : integer number of max samples in chain
     """
     polstr = params_block['pol']
 
@@ -138,7 +139,11 @@ def parse_parameters_block(params_block, verbose=True):
         raise ValueError('Must supply sufficient geometry information in the config')
 
     shape = (len(polstr),) + shape
-    kwargs = {'dtype': params_block.get('dtype')} if params_block.get('dtype') else {}
+    kwargs = {}
+    if 'dtype' in params_block:
+        kwargs['dtype'] = params_block['dtype']
+    if 'max_N' in params_block:
+        kwargs['max_N'] = params_block['max_N']
     return polstr, shape, wcs, kwargs
 
 def get_pol_indices(polstr):
@@ -164,6 +169,7 @@ def eplot(x, *args, fname=None, show=False, **kwargs):
     list
         A list of enplot plot objects.
     """
+    from pixell import enplot
     plots = enplot.plot(x, **kwargs)
     if fname is not None:
         enplot.write(fname, plots)
