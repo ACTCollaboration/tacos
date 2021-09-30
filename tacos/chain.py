@@ -7,7 +7,9 @@ from tacos import utils, mixing_matrix as M
 import warnings
 import os
 
-config = utils.config_from_yaml_resource('configs/sampling.yaml')
+
+chain_path = utils.data_dir_str('chain')
+
 
 class Chain:
 
@@ -41,8 +43,8 @@ class Chain:
         # for each component with active parameters, store parameters separately.
         self._params = self.get_empty_params_sample()
         for comp, param in self.paramsiter(yield_component=True):
-            if param in comp.shapes:
-                shape = comp.shapes[param]
+            if param in comp.param_shapes:
+                shape = comp.param_shapes[param]
             else:
                 shape = self.shape
             self._params[comp.name][param] = np.full((max_N, *shape), np.nan, dtype=dtype)
@@ -52,7 +54,7 @@ class Chain:
         if fname is not None:
             return fname
         elif name is not None:
-            fname = config['output']['chain_path']
+            fname = chain_path
             if name[-5:] != '.hdf5':
                 name += '.hdf5'
             fname += name

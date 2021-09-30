@@ -5,7 +5,6 @@
 # all maps have shape (num_splits, num_pol, ny, nx)
 # all ivars have shape (num_splits, num_pol, num_pol, ny, nx)
 
-from healpy.pixelfunc import nside2resol
 import numpy as np
 
 from pixell import enmap

@@ -57,7 +57,7 @@ beta_d = np.array(pysm_d.mbb_index)
 T_d = np.array(pysm_d.mbb_temperature)
 
 hmodels = [models.Synch(nu0_s), models.Dust(nu0_d)]
-hcomponents = [M.Component(hmodels[0], beta=beta_s), M.Component(hmodels[1], beta=beta_d, T=T_d)]
+hcomponents = [models.Component(hmodels[0], beta=beta_s), models.Component(hmodels[1], beta=beta_d, T=T_d)]
 
 # get act geometry and project components to CAR
 shape, wcs = enmap.read_map_geometry(utils.data_dir_str('raw', 'act') + 'map_pa4_f150_night_set0.fits')
@@ -71,7 +71,7 @@ beta_d_car = reproject.enmap_from_healpix(beta_d, shape, wcs, rot=None)
 T_d_car = reproject.enmap_from_healpix(T_d, shape, wcs, rot=None)
 
 pmodels = [models.Synch(nu0_s_car), models.Dust(nu0_d_car)]
-pcomponents = [M.Component(pmodels[0], beta=beta_s_car), M.Component(pmodels[1], beta=beta_d_car, T=T_d_car)]
+pcomponents = [models.Component(pmodels[0], beta=beta_s_car), models.Component(pmodels[1], beta=beta_d_car, T=T_d_car)]
 
 # get our amplitudes
 a_s = np.array([pysm_s.I_ref.value, pysm_s.Q_ref.value, -pysm_s.U_ref.value])

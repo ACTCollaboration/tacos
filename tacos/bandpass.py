@@ -6,11 +6,11 @@ import h5py
 
 from tacos import units, utils
 
-config = utils.config_from_yaml_resource('configs/bandpass.yaml')
+module_config = utils.config_from_yaml_resource('configs/bandpass.yaml')
 tophat_config = utils.config_from_yaml_resource('configs/bandpass_pysm_tophat.yaml')
 
 class BandPass():
-    '''
+    """
     Bandpass instance contains normalized bandpass and conversion
     factors.
 
@@ -56,7 +56,7 @@ class BandPass():
     If rtol or atol are greater than 0, or if a nu_iterator is provided, such that
     the bandpass changes from the raw data in any way, the output bandpass is renormalized
     such that its integral is still 1 over its domain.
-    '''
+    """
 
     def __init__(self, bandpass, nu, trim_zeros=False, rtol=0., atol=0., nu_iterator=None, nu_low=None, nu_high=None, N=500, delta_nu=0.1e9):
         # Because kwargs may be supplied via a yaml file, numeric kwargs are explicitly cast to correct type
@@ -95,7 +95,7 @@ class BandPass():
         self.cmb_to_rj = units.convert_cmb_to_rj(self.bandpass, self.nu)
 
     def integrate_signal(self, signal, signal_kwargs=None, axis=-1):
-        '''
+        """
         Integrate signal over bandpass.
 
         Parameters
@@ -109,7 +109,7 @@ class BandPass():
         -------
         int_signal : (...) array or int
             Integrated signal.
-        '''
+        """
 
         # Convert callables to arrays
         bandpass = self.bandpass(self.nu)
@@ -129,7 +129,7 @@ class BandPass():
 
     @classmethod
     def load_act_bandpass(cls, filename, band, array=None, **kwargs):
-        '''
+        """
         Read ACT bandpass file and return class instance.
 
         Parameters
@@ -150,7 +150,7 @@ class BandPass():
         ------
         ValueError
             If array is not recognized.        
-        '''
+        """
         # assert the instrument and filename match
         head, tail = os.path.split(filename)
         assert head.split('/')[-1] == 'act'
@@ -186,13 +186,13 @@ class BandPass():
                     bandpass += hfile[f'{ar}/bandpass'][()]
             bandpass /= len(band_arrays)
 
-        bandpass_kwargs = config['act'][band]
+        bandpass_kwargs = module_config['act'][band]
         return cls(bandpass, nu, **bandpass_kwargs)
 
     @classmethod
     def load_planck_bandpass(cls, filename, band, psb_only=True,
                           nu_sq_corr=True, **kwargs):
-        '''
+        """
         Read Planck HFI bandpass file and return class instance.
 
         Parameters
@@ -216,7 +216,7 @@ class BandPass():
         ------
         ValueError
             If band is not recognized.        
-        '''
+        """
         # assert the instrument and filename match
         head, tail = os.path.split(filename)
         assert head.split('/')[-1] == 'planck'
@@ -243,12 +243,12 @@ class BandPass():
             if nu_sq_corr:
                 bandpass *= nu ** 2
 
-        bandpass_kwargs = config['planck'][bandname]
+        bandpass_kwargs = module_config['planck'][bandname]
         return cls(bandpass, nu, **bandpass_kwargs)
 
     @classmethod
     def load_wmap_bandpass(cls, filename, band, **kwargs):
-        '''
+        """
         Read WMAP bandpass file and return class instance.
 
         Parameters
@@ -267,7 +267,7 @@ class BandPass():
         ------
         ValueError
             If band is not recognized.        
-        '''
+        """
         # assert the instrument and filename match
         head, tail = os.path.split(filename)
         assert head.split('/')[-1] == 'wmap'
@@ -303,7 +303,7 @@ class BandPass():
                         bandpass += hfile[f'{bandname}/bandpass'][()]
             bandpass /= nda * 2
                 
-        bandpass_kwargs = config['wmap'][band]
+        bandpass_kwargs = module_config['wmap'][band]
         return cls(bandpass, nu, **bandpass_kwargs)
 
     @classmethod
@@ -350,7 +350,7 @@ class BandPass():
         if tophat:
             bandpass_kwargs = tophat_config['pysm'][band] 
         else:
-            bandpass_kwargs = config['pysm'][band]
+            bandpass_kwargs = module_config['pysm'][band]
         
         bandpass_obj = cls(bandpass, nu, **bandpass_kwargs)
         nu = bandpass_obj.nu

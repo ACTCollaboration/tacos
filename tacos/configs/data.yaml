@@ -1,12 +1,6 @@
-data_paths:
-    map_path: '/projects/ACT/zatkins/data/ACTCollaboration/tacos/maps/'
-    covmat_path: '/projects/ACT/zatkins/data/ACTCollaboration/tacos/covmats/'
-    bandpass_path: '/projects/ACT/zatkins/data/ACTCollaboration/tacos/bandpasses/'
-    beam_path: '/projects/ACT/zatkins/data/ACTCollaboration/tacos/beams/'
-    raw_path: '/projects/ACT/zatkins/data/ACTCollaboration/tacos/raw/'
-
 extensions:
     map: 'fits'
     icovar: 'fits'
     bandpass: 'hdf5'
     beam: 'hdf5'
+    template: 'fits'

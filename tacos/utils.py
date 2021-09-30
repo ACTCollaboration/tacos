@@ -7,6 +7,7 @@ import yaml
 
 import pkgutil
 from ast import literal_eval
+import os
 
 ### I/O ###
 
@@ -25,7 +26,7 @@ def config_from_yaml_resource(resource):
     config = yaml.safe_load(f)
     return config
 
-data_paths = config_from_yaml_resource('configs/data.yaml')['data_paths']
+data_paths = config_from_yaml_file(os.environ['HOME'] + '.soapack.yaml')['tacos']
 extensions = config_from_yaml_resource('configs/data.yaml')['extensions']
 
 def data_fn_str(type=None, instr=None, band=None, id=None, set=None, notes=None):
@@ -40,7 +41,7 @@ def data_fn_str(type=None, instr=None, band=None, id=None, set=None, notes=None)
         type=type, instr=instr, band=band, id=id, set=set, notes=notes, ext=extensions[type]
         )
 
-def data_dir_str(product, instr):
+def data_dir_str(product, instr=''):
     """Returns a generic data directory, of format '{product_dir}{instr}/'
     """
     data_dir_str_template = '{product_dir}{instr}/'
@@ -272,9 +273,11 @@ def atleast_nd(arr, n, axis=None):
     return np.expand_dims(arr, oaxis)
 
 def expand_all_arg_dims(*args):
+    """Append an extra dimension to all args, even if scalar."""
     return (np.atleast_1d(a)[..., None] for a in args)
 
 def expand_all_kwarg_dims(**kwargs):
+    """Append an extra dimension to all values in kwargs, even if scalar"""
     return {k: np.atleast_1d(v)[..., None] for k, v in kwargs.items()}
 
 def symmetrize(arr, axis1=0, axis2=1, method='average'):
