@@ -205,6 +205,7 @@ class Component:
 
         if 'params' in comp_block:
             for param_name, param_block in comp_block['params'].items():
+                
                 assert param_name in model.params, f'Param {param_name} not in {model_name} params'
                 
                 # if a particular param has a value, parse it

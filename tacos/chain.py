@@ -135,10 +135,25 @@ class Chain:
             assert self._N > 0, 'Cannot get samples from empty chain'
             sel = np.s_[-1 % self._N] # get most recent *written* element
         return (
-            self._weights[sel], self._amplitudes[sel], self._get_params(sel)
+            self.get_weights(sel=sel), self.get_amplitudes(sel=sel), self.get_params(sel=sel)
         )
 
-    def _get_params(self, sel):
+    def get_weights(self, sel=None):
+        if sel is None:
+            assert self._N > 0, 'Cannot get samples from empty chain'
+            sel = np.s_[-1 % self._N] # get most recent *written* element
+        return self._weights[sel]
+
+    def get_amplitudes(self, sel=None):
+        if sel is None:
+            assert self._N > 0, 'Cannot get samples from empty chain'
+            sel = np.s_[-1 % self._N] # get most recent *written* element
+        return self._amplitudes[sel]
+
+    def get_params(self, sel=None):
+        if sel is None:
+            assert self._N > 0, 'Cannot get samples from empty chain'
+            sel = np.s_[-1 % self._N] # get most recent *written* element
         d = self.get_empty_params_sample()
         for comp, param in self.paramsiter():
             d[comp][param] = self._params[comp][param][sel]

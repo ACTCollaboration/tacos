@@ -112,7 +112,7 @@ class MixingMatrix:
                 f'Params object shape {chain.shape} must equal matrix shape {self.matrix.shape[2:]}'
             assert len(comp_params) == 0, \
                 'If Chain instance is passed, cannot also pass implicit component parameters'
-            _, _, comp_params = chain.get_samples(sel=np.s_[iteration])
+            comp_params = chain.get_params(sel=np.s_[iteration])
 
         # update Elements by component
         for compidx, comp_name in enumerate(self._elements):
