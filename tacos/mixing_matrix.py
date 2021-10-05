@@ -89,6 +89,8 @@ class MixingMatrix:
     
     def __init__(self, channels, components, shape, wcs=None, dtype=np.float32):
 
+        self._channels = channels
+        self._components = components
         nchan = len(channels)
         ncomp = len(components)
 
@@ -126,6 +128,14 @@ class MixingMatrix:
     def load_from_config(cls, config_path, verbose=True):
         _, channels, components, _, shape, wcs, kwargs = _load_all_from_config(config_path, verbose=verbose)
         return cls(channels, components, shape, wcs, **kwargs)
+
+    @property
+    def channels(self):
+        return self._channels
+
+    @property
+    def components(self):
+        return self._components
 
     @property
     def matrix(self):
