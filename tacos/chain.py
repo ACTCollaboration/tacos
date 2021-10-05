@@ -226,8 +226,10 @@ class Chain:
         else:
             fname = self._get_fname(fname, name)
 
-        # get all the samples
+        # get all the samples; this means up to the current counter. beyond
+        # the current counter is always garbage. check this!
         weights, amplitudes, params = self.get_samples(sel=np.s_[:self._N])
+        self._check_samples(weights, amplitudes, params)
 
         if overwrite or not os.path.exists(fname):
             with h5py.File(fname, 'w') as hfile:
@@ -237,17 +239,23 @@ class Chain:
 
                 # create new datasets with 1 chunk per sample and unlimited future samples
                 hgroup.create_dataset(
-                    'weights', data=weights,
-                    chunks=(1, *weights.shape[1:]), maxshape=(None, *weights.shape[1:])
+                    'weights',
+                    data=weights,
+                    chunks=(1, *weights.shape[1:]),
+                    maxshape=(None, *weights.shape[1:])
                     )
                 hgroup.create_dataset(
-                    'amplitudes', data=amplitudes,
-                    chunks=(1, *amplitudes.shape[1:]), maxshape=(None, *amplitudes.shape[1:])
+                    'amplitudes',
+                    data=amplitudes,
+                    chunks=(1, *amplitudes.shape[1:]),
+                    maxshape=(None, *amplitudes.shape[1:])
                     )
                 for comp, param in self.paramsiter():
                     hgroup.create_dataset(
-                        f'params/{comp}/{param}', data=params[comp][param],
-                        chunks=(1, *params[comp][param].shape[1:]), maxshape=(None, *params[comp][param].shape[1:])
+                        f'params/{comp}/{param}',
+                        data=params[comp][param],
+                        chunks=(1, *params[comp][param].shape[1:]),
+                        maxshape=(None, *params[comp][param].shape[1:])
                         )
         else:
             with h5py.File(fname, 'r+') as hfile:
