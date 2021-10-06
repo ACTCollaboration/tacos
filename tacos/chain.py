@@ -314,5 +314,9 @@ class Chain:
         return self._shape
 
     @property
+    def dtype(self):
+        return self._dtype
+
+    @property
     def name(self):
         return self._name

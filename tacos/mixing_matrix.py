@@ -91,10 +91,10 @@ class MixingMatrix:
 
         self._channels = channels
         self._components = components
-        nchan = len(channels)
-        ncomp = len(components)
+        num_chan = len(channels)
+        num_comp = len(components)
 
-        self.shape = shape
+        self._element_shape = shape
         utils.check_shape(self.shape)
 
         self._wcs = wcs # if this is None, return array as-is (ie, healpix), see matrix property
@@ -106,10 +106,13 @@ class MixingMatrix:
             for chan in channels:
                 self._elements[comp.name].append(Element(chan, comp))
         
-        self._matrix = np.zeros((nchan, ncomp) + shape, dtype=dtype)
+        self._shape = (num_chan, num_comp) + shape
+        self._matrix = np.zeros(self._shape, dtype=dtype)
 
     def __call__(self, chain=None, iteration=-1, **comp_params):
         if chain is not None:
+            assert chain.dtype == self._dtype, \
+                f'Chain dtype {chain.dtype} does not match Mixing Matrix dtype {self._dtype}'
             assert chain.shape == self._matrix.shape[2:], \
                 f'Params object shape {chain.shape} must equal matrix shape {self.matrix.shape[2:]}'
             assert len(comp_params) == 0, \
@@ -120,7 +123,8 @@ class MixingMatrix:
         for compidx, comp_name in enumerate(self._elements):
             active_params = comp_params.get(comp_name, {})
             for chanidx, element in enumerate(self._elements[comp_name]):
-                self._matrix[chanidx, compidx] = element(**active_params)
+                # this line is where all the broadcasting must come together!
+                self._matrix[chanidx, compidx] = element(**active_params) 
 
         return self.matrix
 
@@ -136,6 +140,14 @@ class MixingMatrix:
     @property
     def components(self):
         return self._components
+
+    @property
+    def element_shape(self):
+        return self._element_shape
+
+    @property
+    def shape(self):
+        return self._shape
 
     @property
     def matrix(self):

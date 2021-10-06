@@ -1,13 +1,171 @@
 # helper utility functions
 from pixell import enmap, curvedsky, utils
+from enlib import array_ops
+
 import healpy as hp 
 import camb
 import numpy as np
 import yaml
 
+import hashlib
+from concurrent import futures
+import multiprocessing
 import pkgutil
 from ast import literal_eval
 import os
+
+### tacos ###
+
+def get_cpu_count():
+    """Number of available threads, either from environment variable 'OMP_NUM_THREADS' or physical CPU cores"""
+    try:
+        nthread = int(os.environ['OMP_NUM_THREADS'])
+    except (KeyError, ValueError):
+        nthread = multiprocessing.cpu_count()
+    return nthread
+
+def concurrent_standard_normal(size=1, nchunks=100, nthread=0, seed=None, dtype=np.float32, complex=False):
+    """Draw standard normal (real or complex) random variates concurrently.
+    
+    Parameters
+    ----------
+    size : int or iterable, optional
+        The shape to draw random numbers into, by default 1.
+    nchunks : int, optional
+        The number of concurrent subdraws to make, by default 100. 
+        These draws are concatenated in the output; therefore, the
+        output changes both with the seed and with nchunks.
+    nthread : int, optional
+        Number of concurrent threads, by default 0. If 0, the result
+        of get_cpu_count().
+    seed : int or iterable-of-ints, optional
+        Random seed to pass to np.random.SeedSequence, by default None.
+    dtype : np.dtype, optional
+        Data type of output if real, or of each real and complex,
+        component, by default np.float32. Must be a 4- or 8-byte
+        type.
+    complex : bool, optional
+        If True, return a complex random variate, by default False.
+    
+    Returns
+    -------
+    ndarray
+        Real or complex standard normal random variates in shape 'size'
+        with each real and/or complex part having dtype 'dtype'. 
+    
+    Raises
+    ------
+    ValueError
+        If the dtype does not have 4 or 8 bytes.
+    """
+    # get size per chunk draw
+    totalsize = np.prod(size, dtype=int)
+    chunksize = np.ceil(totalsize/nchunks).astype(int)
+
+    # get seeds
+    ss = np.random.SeedSequence(seed)
+    rngs = [np.random.default_rng(s) for s in ss.spawn(nchunks)]
+    
+    # define working objects
+    out = np.empty((nchunks, chunksize), dtype=dtype)
+    if complex:
+        out_imag = np.empty_like(out)
+
+    # perform multithreaded execution
+    if nthread == 0:
+        nthread = get_cpu_count()
+    executor = futures.ThreadPoolExecutor(max_workers=nthread)
+
+    def _fill(arr, start, stop, rng):
+        rng.standard_normal(out=arr[start:stop], dtype=dtype)
+    
+    fs = [executor.submit(_fill, out, i, i+1, rngs[i]) for i in range(nchunks)]
+    futures.wait(fs)
+
+    if complex:
+        fs = [executor.submit(_fill, out_imag, i, i+1, rngs[i]) for i in range(nchunks)]
+        futures.wait(fs)
+
+        # if not concurrent, casting to complex takes 80% of the time for a complex draw
+        if np.dtype(dtype).itemsize == 4:
+            idtype = np.complex64
+        elif np.dtype(dtype).itemsize == 8:
+            idtype = np.complex128
+        else:
+            raise ValueError('Input dtype must have 4 or 8 bytes')
+        imag_vec = np.full((nchunks, 1), 1j, dtype=idtype)
+        out_imag = concurrent_op(np.multiply, out_imag, imag_vec, nchunks=nchunks, nthread=nthread)
+        out = concurrent_op(np.add, out, out_imag, nchunks=nchunks, nthread=nthread)
+
+    # return
+    out = out.reshape(-1)[:totalsize]
+    return out.reshape(size)
+
+def concurrent_op(op, a, b, *args, chunk_axis_a=0, chunk_axis_b=0, nchunks=100, nthread=0, **kwargs):
+    """Perform a numpy operation on two arrays concurrently.
+    
+    Parameters
+    ----------
+    op : numpy function
+        A numpy function to be performed, e.g. np.add or np.multiply
+    a : ndarray
+        The first array in the operation.
+    b : ndarray
+        The second array in the operation
+    chunk_axis_a : int, optional
+        The axis in a over which the operation may be applied
+        concurrently, by default 0.
+    chunk_axis_b : int, optional
+        The axis in b over which the operation may be applied
+        concurrently, by default 0.
+    nchunks : int, optional
+        The number of chunks to loop over concurrently, by default 100.
+    nthread : int, optional
+        The number of threads, by default 0.
+        If 0, use output of get_cpu_count().
+    Returns
+    -------
+    ndarray
+        The result of op(a, b, *args, **kwargs), except with the axis
+        corresponding to the a, b chunk axes located at axis-0.
+    
+    Notes
+    -----
+    The chunk axes are what a user might expect to naively 'loop over'. For
+    maximum efficiency, they should be long. They must be of equal size in
+    a and b.
+    """
+    # move axes to standard positions
+    a = np.moveaxis(a, chunk_axis_a, 0)
+    b = np.moveaxis(b, chunk_axis_b, 0)
+    assert a.shape[0] == b.shape[0], f'Size of chunk axis must be equal, got {a.shape[0]} and {b.shape[0]}'
+    
+    # get size per chunk draw
+    totalsize = a.shape[0]
+    chunksize = np.ceil(totalsize/nchunks).astype(int)
+
+    # define working objects
+    # in order to get output shape, dtype, must get shape, dtype of op(a[0], b[0])
+    out_test = op(a[0], b[0], *args, **kwargs)
+    out = np.empty((totalsize, *out_test.shape), dtype=out_test.dtype)
+
+    # perform multithreaded execution
+    if nthread == 0:
+        nthread = get_cpu_count()
+    executor = futures.ThreadPoolExecutor(max_workers=nthread)
+
+    def _fill(start, stop):
+        op(a[start:stop], b[start:stop], *args, out=out[start:stop], **kwargs)
+    
+    fs = [executor.submit(_fill, i*chunksize, (i+1)*chunksize) for i in range(nchunks)]
+    futures.wait(fs)
+
+    # return
+    return out
+
+def hash_str(str, ndigits=9):
+    """Turn a qid string into an ndigit hash, using hashlib.sha256 hashing"""
+    return int(hashlib.sha256(str.encode('utf-8')).hexdigest(), 16) % 10**ndigits
 
 ### I/O ###
 
@@ -26,7 +184,7 @@ def config_from_yaml_resource(resource):
     config = yaml.safe_load(f)
     return config
 
-data_paths = config_from_yaml_file(os.environ['HOME'] + '.soapack.yaml')['tacos']
+data_paths = config_from_yaml_file(os.environ['HOME'] + '/.soapack.yml')['tacos']
 extensions = config_from_yaml_resource('configs/data.yaml')['extensions']
 
 def data_fn_str(type=None, instr=None, band=None, id=None, set=None, notes=None):
@@ -352,8 +510,8 @@ def symmetrize(arr, axis1=0, axis2=1, method='average'):
     
     return arr 
 
-def eigpow(A, e, axes=[-2, -1], rlim=None, alim=None):
-    """A hack around pixell.utils.eigpow which upgrades the data
+def eigpow(A, e, axes=[-2, -1]):
+    """A hack around enlib.array_ops.eigpow which upgrades the data
     precision to at least double precision if necessary prior to
     operation.
     """
@@ -373,16 +531,16 @@ def eigpow(A, e, axes=[-2, -1], rlim=None, alim=None):
     else:
         recast = False
 
-    O = utils.eigpow(A, e, axes=axes, rlim=rlim, alim=alim)
+    array_ops.eigpow(A, e, axes=axes, copy=False)
 
     # cast back to input precision if necessary
     if recast:
-        O = np.asanyarray(O, dtype=dtype)
+        A = np.asanyarray(A, dtype=dtype)
 
     if is_enmap:
-        O =  enmap.ndmap(O, wcs)
+        A = enmap.ndmap(A, wcs)
 
-    return O
+    return A
 
 ### Maps ###
 
@@ -616,3 +774,10 @@ def fwhm_from_ell_bell(ell, bell):
     sigma = np.sqrt(-2 * np.log(bell) / (ell*(ell+1)))
     fwhm = sigma * np.sqrt(8 * np.log(2))
     return fwhm
+
+def polstr2polidxs(polstr):
+    if polstr:
+        polidxs = np.array(['IQU'.index(char) for char in polstr])
+    else:
+        polidxs = np.arange(3)
+    return polidxs

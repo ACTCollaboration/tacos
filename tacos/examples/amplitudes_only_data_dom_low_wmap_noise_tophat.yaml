@@ -11,7 +11,7 @@ channels:
     wmap:
         K:
             pysm: True
-            noise: 0
+            sim_num: 0
             pysm_notes: tophat
             bandpass_kwargs:
                 tophat: True
@@ -19,7 +19,7 @@ channels:
                 mult_fact: 100
         Ka:
             pysm: True
-            noise: 20
+            sim_num: 20
             pysm_notes: tophat
             bandpass_kwargs:
                 tophat: True
@@ -27,63 +27,63 @@ channels:
                 mult_fact: 100
         Q:
             pysm: True
-            noise: 11
+            sim_num: 11
             pysm_notes: tophat
             bandpass_kwargs:
                 tophat: True
         V:
             pysm: True
-            noise: 21
+            sim_num: 21
             pysm_notes: tophat
             bandpass_kwargs:
                 tophat: True
         W:
             pysm: True
-            noise: 22
+            sim_num: 22
             pysm_notes: tophat
             bandpass_kwargs:
                 tophat: True
     act:
         f090:
             pysm: True
-            noise: 1
+            sim_num: 1
             pysm_notes: tophat
             bandpass_kwargs:
                 tophat: True
         f150:
             pysm: True
-            noise: 2
+            sim_num: 2
             pysm_notes: tophat
             bandpass_kwargs:
                 tophat: True
         f220:
             pysm: True
-            noise: 3
+            sim_num: 3
             pysm_notes: tophat
             bandpass_kwargs:
                 tophat: True
     planck:
         '100':
             pysm: True
-            noise: 30
+            sim_num: 30
             pysm_notes: tophat
             bandpass_kwargs:
                 tophat: True
         '143':
             pysm: True
-            noise: 31
+            sim_num: 31
             pysm_notes: tophat
             bandpass_kwargs:
                 tophat: True
         '217':
             pysm: True
-            noise: 99
+            sim_num: 99
             pysm_notes: tophat
             bandpass_kwargs:
                 tophat: True
         '353':
             pysm: True
-            noise: 4
+            sim_num: 4
             pysm_notes: tophat
             bandpass_kwargs:
                 tophat: True

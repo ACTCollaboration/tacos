@@ -1,5 +1,7 @@
 #!/usr/bin/env python3
 
+COADD_SPLIT_NUM = 103_094
+
 # classes and helper functions that support easy loading/packaging of data on-disk
 # for analysis
 # all maps have shape (num_splits, num_pol, ny, nx)
@@ -17,9 +19,9 @@ from tacos.bandpass import BandPass
 # and one frequency (and optionally, one detector subset)
 class Channel:
 
-    def __init__(self, instr, band, id=None, set=None, notes=None, pysm_notes=None, correlated_noise=False, pysm=False, 
-                    healpix=False, cmb=False, cmb_kwargs=None, noise=False, noise_kwargs=None, 
-                    beam_kwargs=None, bandpass_kwargs=None, **kwargs):
+    def __init__(self, instr, band, id=None, set=None, notes=None, polstr=None, pysm_notes=None,
+                    correlated_noise=False, pysm=False, healpix=False, cmb=False, cmb_kwargs=None,
+                    sim_num=False, noise_kwargs=None, beam_kwargs=None, bandpass_kwargs=None, **kwargs):
         """Channel instance holding map data, covariance data, bandpasses, and beams. 
 
         Parameters
@@ -31,9 +33,12 @@ class Channel:
         id : str, optional
             The subset of the instrument + band data, e.g. detectors, by default 'all'
         set : str, optional
-            The data split, e.g. "set0", "set1", or "coadd"
+            The data split, e.g. "set0", "set1". If None, passes "coadd"
         notes : str, optional
             Additional identifier to append to data filenames, by default None
+        polstr : str, optional
+            Which Stokes components to slice out of data and noise model (order preserved).
+            If None, then retain all 3. Default is None.
         pysm_notes : str, optional
             Additional identifier unique to pysm data, by default None. Only operative if
             pysm is True. If notes is passed but pysm_notes is not, assume pysm_notes = notes
@@ -51,10 +56,10 @@ class Channel:
             None. Raises exception if pysm is False.
         cmb_kwargs : dict or None, optional
             Any kwargs to pass to utils.get_cmb_sim(...), by default None
-        noise : bool, None, int, or tuple-of-int
-            Whether to add a noise realization to the map. False will pass; None, int, or
-            tuple-of-int will be set as the seed of the realization. True will set cmb to
-            None. Raises exception if pysm is False.
+        sim_num : None or int, optional
+            Whether to add a noise realization to the map (None does not). int will help
+            set the seed of the realization through NoiseModel.get_sim(sim_num=noise). 
+            Raises exception if pysm is False. Default is None.
         noise_kwargs: dict or None, optional
             Any kwargs to pass to utils.get_icovar_noise_sim(...), by default None
         beam_kwargs : dict, optional
@@ -80,18 +85,19 @@ class Channel:
         if id is None:
             id = 'all'
         self.id = id
-        if set is None:
+        if set:
+            self._split_num = int(set[-1]) # e.g. 'set3'
+        else:
             set = 'coadd'
+            self._split_num = COADD_SPLIT_NUM
         self.set = set
         self.notes = notes
+        self._polidxs = utils.polstr2polidxs(polstr)
         self.correlated_noise = correlated_noise
-        self.pysm = pysm
-        self.healpix = healpix
-
         if self.correlated_noise:
             raise NotImplementedError('Correlated noise not yet implemented')
-        else:
-            self.covmat_type = 'icovar'
+        self.pysm = pysm
+        self.healpix = healpix
 
         # maps and icovars
         if pysm:
@@ -124,14 +130,15 @@ class Channel:
             raise NotImplementedError('There are no healpix maps of actual data')
         else:
             raise AssertionError("How did we end up here?")
-
-        covmat_path = utils.data_dir_str('covmat', instr)
-        covmat_path += utils.data_fn_str(type=self.covmat_type, instr=instr, band=band, id=id, set=set, notes=notes)
+        self._map = self._map[self._polidxs]
         
         # add optional mult_fact from noise_kwargs
         noise_kwargs = {} if noise_kwargs is None else noise_kwargs
         mult_fact = noise_kwargs.get('mult_fact', 1)
-        self._covmat = mult_fact * enmap.read_map(covmat_path) # (npol, npol, ny, nx)
+        if self.correlated_noise:
+            pass
+        else:
+            self._noise_model = SimplePixelNoiseModel(instr, band, id, set, notes=notes, polstr=polstr, mult_fact=mult_fact)
 
         # beams
         beam_path = utils.data_dir_str('beam', instr)
@@ -170,14 +177,9 @@ class Channel:
             cmb_kwargs = {} if cmb_kwargs is None else cmb_kwargs
             self._map += utils.get_cmb_sim(self.map.shape, self.map.wcs, dtype=self.map.dtype, seed=cmb, **cmb_kwargs)
 
-        if noise is not False:
+        if sim_num is not False:
             assert pysm, 'Can only add a noise realization to a simulated map'
-            if noise is True:
-                noise = None
-            if self.covmat_type == 'icovar':
-                self._map += utils.get_icovar_noise_sim(icovar=self.covmat, seed=noise)
-            else:
-                raise NotImplementedError('Correlated noise not yet implemented')
+            self._map += self._noise_model.get_sim(self._split_num, sim_num)
 
     def convolve_to_beam(self, bell):
         pass
@@ -190,8 +192,8 @@ class Channel:
         return self._map
 
     @property
-    def covmat(self):
-        return self._covmat
+    def noise_model(self):
+        return self._noise_model
 
     @property
     def beam(self):
@@ -200,3 +202,79 @@ class Channel:
     @property
     def bandpass(self):
         return self._bandpass
+
+    
+class SimplePixelNoiseModel:
+
+    def __init__(self, instr, band, id, set, notes=None, polstr=None, mult_fact=1):
+        self._instr = instr
+        self._band = band
+        self._id = id
+        self._set = set
+        self._notes = notes
+        
+        self._polidxs = utils.polstr2polidxs(polstr)
+
+        self._mult_fact = mult_fact
+        
+        fn = self._get_model_fn(instr, band, set)
+        self._nm_dict = self._read_model(fn)
+        self._shape = self.model.shape
+        self._dtype = self.model.dtype
+
+    def _get_model_fn(self, instr, band, set):
+        """Get a noise model filename for split split_num; return as <str>"""
+        assert set in ['set0', 'set1', 'coadd']
+        inv_cov_mat_path = utils.data_dir_str('covmat', instr)
+        if not self._notes:
+            notes = ''
+        else:
+            notes = '_' + self._notes
+        inv_cov_mat_path += utils.data_fn_str(type='icovar', instr=instr, band=band, id='all', set=set, notes=notes)
+        return inv_cov_mat_path
+
+    def _read_model(self, fn):
+        """Read a noise model with filename fn; return a dictionary of noise model variables"""
+        inv_cov_mat = enmap.read_map(fn)
+        assert inv_cov_mat.ndim == 4, \
+            'Inverse covariance matrices for a single dataset must have shape (npol, npol, ny, nx)'
+        inv_cov_mat = inv_cov_mat[np.ix_(self._polidxs, self._polidxs)] * self._mult_fact
+        inv_cov_mat = utils.atleast_nd(inv_cov_mat, 4)
+        return {'inv_cov_mat': inv_cov_mat}
+
+    def get_sim(self, split_num, sim_num):
+        seed = (split_num, sim_num)
+        seed += utils.hash_str(self._instr)
+        seed += utils.hash_str(self._band)
+        seed += utils.hash_str(self._id)
+        seed += utils.hash_str(self._set)
+
+        eta = utils.concurrent_standard_normal(
+            size=(self._shape[1:]), seed=seed, dtype=self._dtype
+            )
+        return self.filter(eta, power=0.5)
+
+    def filter(self, imap, power=-1):
+        assert imap.shape == self._shape[1:], \
+            f'Covariance matrix has shape {self._shape}, so imap must have shape {self._shape[1:]}'
+        if power == -1:
+            model = self.model
+        else:
+            try:
+                # so we don't have to recompute if filtering by the same power later
+                model = self._nm_dict[power]
+            except KeyError:
+                # because self.model already has -1 in exponent
+                model = utils.eigpow(self.model, -power, axes=[-4, -3])
+                self._nm_dict[power] = model
+        return np.einsum('ab...,b...->a...', model, imap)
+
+    @property
+    def model(self):
+        return self._nm_dict['inv_cov_mat']
+
+    @model.setter
+    def model(self, value):
+        assert value.shape == self._shape, \
+            f'Set shape is {value.shape}, expected {self._shape}'
+        self._nm_dict['inv_cov_mat'] = value

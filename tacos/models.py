@@ -118,7 +118,7 @@ class Component:
                 self.active_params.append(param)
 
         # store broadcasters. these are used to guarantee a parameter of a given 
-        # shape will broadcast against the amplitude map. there can be broadcasters
+        # shape will broadcast against the mixing matrix. there can be broadcasters
         # for any parameter, which are evaluated prior to interpolation, and a 
         # broadcaster for the entire component, which is evaluated after interpolation        
 
