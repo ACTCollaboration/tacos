@@ -177,7 +177,7 @@ class Channel:
             cmb_kwargs = {} if cmb_kwargs is None else cmb_kwargs
             self._map += utils.get_cmb_sim(self.map.shape, self.map.wcs, dtype=self.map.dtype, seed=cmb, **cmb_kwargs)
 
-        if sim_num is not False:
+        if sim_num is not None:
             assert pysm, 'Can only add a noise realization to a simulated map'
             self._map += self._noise_model.get_sim(self._split_num, sim_num)
 

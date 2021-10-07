@@ -41,9 +41,10 @@ class LinSampler(ABC):
         self._prior_models = prior_models
         self._dtype = dtype
 
-        num_chan, num_comp = self._mixing_matrix.shape[:2]
+        num_chan, num_comp, num_pol = self._mixing_matrix.shape[:3]
         self._num_chan = num_chan
         self._num_comp = num_comp
+        self._num_pol = num_pol
 
         # save noise-filtered data, which we only need to calculate once
         # has shape (num_chan, num_pol, ...)
@@ -95,13 +96,15 @@ class LinSampler(ABC):
     def _get_RHS(self, M, eta_d, eta_s=None):
         # TODO: implement correlated filtering
 
+        # TODO: if want to implement SHT basis, implement complex random draws
+
         # want to do this MN_invd = np.einsum('jca...,jab...,jb...->ca...', M, N_inv, d)
         # which is the same as the below
         # NOTE: because of the intermediate calculation, you double the floating point error
         # so e.g. 32bit float 1e-6 -> 1e-5 vs 64bit float 1e-15->1e-14
 
         # TODO: parallelize einsums
-        RHS = np.einsum('jc...,j...->c...', M, self._Ninvd)
+        RHS = np.einsum('jca...,ja...->ca...', M, self._Ninvd)
 
         # avoid this sum if Sinvm is 0
         if self._Sinvm:
@@ -111,7 +114,7 @@ class LinSampler(ABC):
         eta_d = np.array(
             [self._noise_models[i].filter(eta_d[i], power=-0.5) for i in range(self._num_chan)], dtype=self._dtype
             )
-        RHS += np.einsum('jc...,j...->c...', M, eta_d)
+        RHS += np.einsum('jca...,ja...->ca...', M, eta_d)
 
         # avoid prior sample if not necessary
         if eta_s:
@@ -132,18 +135,35 @@ class SingleBasis(LinSampler):
     # Take advantage of all objects being in the same basis to perform an "exact" inversion
     # of the amplitude sampling. This assumes of course that all objects are sufficiently
     # sparse even in this basis. Also makes same pixel-space assumption as base class (for now)
-
+    
     def __init__(self, mixing_matrix, noise_models, data, prior_models=None, priors=None, dtype=np.float32):
-        super().__init__(mixing_matrix, noise_models, data, prior_models=prior_models,
-                            priors=priors, dtype=dtype)
-
-        # we want to precompute N^-1, S^-1, N^-0.5, and S^-0.5 such that the NoiseModel
-        # instances are guaranteed to hold a reference to these matrices explicitly. That
-        # way, a call to filter(), filter(power=-0.5) is fast, as is the call to
-        # NoiseModel.model to build the LHS
+        super().__init__(mixing_matrix, noise_models, data, prior_models=prior_models, priors=priors,
+                            dtype=dtype)
+        
+        # prebuild LHS noise model arrays
+        self._Ninv = np.array([noise_models[i].model for i in range(self._num_chan)], dtype=dtype)
+        if prior_models:
+            self._Sinv = np.array([prior_models[i].model for i in range(self._num_comp)], dtype=dtype)
+        else:
+            self._Sinv = None
 
     def _solve(self, M, RHS):
-        pass
+        LHS = np.einsum('jca...,jab...,jdb...->cadb...', M, self._N_inv, M) # ncomp, npol, ncomp, npol
+        if self._Sinv:
+            LHS += self._Sinv
+        
+        # we can explicitly invert!
+        LHS = LHS.reshape(
+            self._num_comp*self._num_pol, self._num_comp*self._num_pol, *LHS.shape[4:]
+            )
+        LHS = utils.eigpow(LHS, -1, axes=[0, 1])
+        LHS = LHS.reshape(
+            self._num_comp*self._num_pol, self._num_comp*self._num_pol, *LHS.shape[4:]
+            )
+
+        # now solve
+        return np.einsum('cadb...,ca...->db...', LHS, RHS)
+
 
 class MixedBasis(LinSampler):
 
