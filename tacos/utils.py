@@ -184,6 +184,13 @@ def config_from_yaml_resource(resource):
     config = yaml.safe_load(f)
     return config
 
+def config_from_yaml(filename_or_resource):
+    try:
+        config = utils.config_from_yaml_resource(filename_or_resource)
+    except FileNotFoundError:
+        config = utils.config_from_yaml_file(filename_or_resource)
+    return config
+
 data_paths = config_from_yaml_file(os.environ['HOME'] + '/.soapack.yml')['tacos']
 extensions = config_from_yaml_resource('configs/data.yaml')['extensions']
 
@@ -228,96 +235,11 @@ def read_geometry_from(s, healpix=False):
         shape, wcs = enmap.read_map_geometry(s)
         return shape[-2:], wcs # just want the map shape, no pol
 
-def parse_parameters_block(params_block, verbose=True):
-    """Parse the parameters block of a config file and return the polarization string,
-    map shape (including polarization components), and optionally the wcs and other
-    kwargs to pass to MixingMatrix(...), Params(...) constructors.
-
-    Parameters
-    ----------
-    params_block : dict
-        A dictionary corresponding to the parameters block of a configuration file. See
-        notes for required entries.
-    verbose : bool
-        Print informative statements.
-
-    Notes
-    -----
-    Some keys in params_block are required. These are:
-        
-        healpix : bool
-        pol : a string in {IQU | IQ | IU | QU | I | Q | U}
-
-    Some keys in params_block are members of a set, only one of which must be provided:
-
-        {geometry_from : path | shape : tuple, wcs_from: path | nside: int}
-
-    Some keys in params_block are optional. These are:
-
-        dtype : string formatter for numpy datatype
-        max_N : integer number of max samples in chain
-    """
-    polstr = params_block['pol']
-    assert polstr in ['IQU', 'IQ', 'IU', 'QU', 'I', 'Q', 'U']
-
-    # get whether to assume maps are in healpix
-    healpix = params_block['healpix']
-    if verbose:
-        pixstr = 'HEALPix' if healpix else 'CAR'
-        print(f'Maps assumed to be in {pixstr} pixelization')
-
-    # if geometry_from is provided, grab that info
-    if 'geometry_from' in params_block:
-        assert 'shape' not in params_block and 'wcs_from' not in params_block and 'nside' not in params_block, \
-            'Path to geometry, and shape, path to wcs, or nside provided; ambiguous'
-        if verbose:
-            print(f'Reading map geometry from path {params_block["geometry_from"]}')
-        geometry = read_geometry_from(params_block['geometry_from'], healpix)
-
-        # get the geometry-like objects for car vs. healpix
-        try:
-            shape, wcs = geometry # car
-        except ValueError:
-            shape, wcs = geometry, None # healpix
-
-    # otherwise, grab shape and possibly wcs info
-    elif 'shape' in params_block:
-        assert not healpix, 'Maps in HEALPix; cannot supply shape or wcs in config'
-        assert 'geometry_from' not in params_block, \
-            'Path to geometry, and shape, path to wcs_provided; ambiguous'
-        if verbose:
-            print(f'Reading shape from config directly, found {params_block["shape"]}')
-        shape = literal_eval(params_block['shape'])
-
-        if verbose:
-            print(f'Reading wcs from path {params_block["wcs_from"]}')
-        _, wcs = read_geometry_from(params_block['wcs_from'], healpix=False)
-
-    # otherwise, grab nside
-    elif 'nside' in params_block:
-        assert healpix, 'Maps in HEALPix; must supply nside if not path to geometry'
-        assert 'geometry_from' not in params_block, \
-            'Path to geometry, and nside; ambiguous'
-        if verbose:
-            print(f'Reading nside from config directly, found {params_block["nside"]}')
-        shape = tuple([hp.nside2npix(params_block['nside'])])
-        wcs = None
-
-    # otherwise, throw error
-    else:
-        raise ValueError('Must supply sufficient geometry information in the config')
-
-    shape = (len(polstr),) + shape
-    kwargs = {}
-    if 'dtype' in params_block:
-        kwargs['dtype'] = params_block['dtype']
-    if 'max_N' in params_block:
-        kwargs['max_N'] = params_block['max_N']
-    return polstr, shape, wcs, kwargs
-
-def parse_maplike_value(value, healpix, resource_path, dtype=np.float32, 
+def parse_maplike_value(value, healpix, resource_path, dtype=None, 
                         scalar_verbose_str=None, fullpath_verbose_str=None, resource_verbose_str=None,
                         verbose=False):
+    dtype = dtype if dtype else np.float32
+    
     if isinstance(value, (int, float)):
         if verbose:
             print(scalar_verbose_str)
@@ -329,7 +251,7 @@ def parse_maplike_value(value, healpix, resource_path, dtype=np.float32,
             if verbose:
                 print(fullpath_verbose_str)
             if healpix:
-                value = hp.read_map(value, field=None, dtype=np.float32)
+                value = hp.read_map(value, field=None, dtype=dtype)
             else:
                 value = enmap.read_map(value)
         
@@ -348,6 +270,127 @@ def parse_maplike_value(value, healpix, resource_path, dtype=np.float32,
     
     return value
 
+class GlobalConfigBlock:
+
+    def __init__(self, config_path, verbose=True):
+        """Parse the global block of a config file and return the polarization string,
+        map shape (including polarization components), and optionally the wcs and other
+        kwargs to pass to MixingMatrix(...), Params(...) constructors.
+
+        Parameters
+        ----------
+        global_block : dict
+            A dictionary corresponding to the parameters block of a configuration file. See
+            notes for required entries.
+        verbose : bool
+            Print informative statements.
+
+        Notes
+        -----
+        Some keys in params_block are required. These are:
+            
+            healpix : bool
+            pol : a string in {IQU | IQ | IU | QU | I | Q | U}
+
+        Some keys in params_block are members of a set, only one of which must be provided:
+
+            {geometry_from : path | shape : tuple, wcs_from: path | nside: int}
+
+        Some keys in params_block are optional. These are:
+
+            dtype : string formatter for numpy datatype
+            max_N : integer number of max samples in chain
+        """
+        config_dict = config_from_yaml(config_path)
+        global_block = config_dict['global']
+
+        polstr = global_block['pol']
+        assert polstr in ['IQU', 'IQ', 'IU', 'QU', 'I', 'Q', 'U']
+        self._polstr = polstr
+
+        # get whether to assume maps are in healpix
+        healpix = global_block['healpix']
+        if verbose:
+            pixstr = 'HEALPix' if healpix else 'CAR'
+            print(f'Maps assumed to be in {pixstr} pixelization')
+        self._healpix = healpix
+
+        # if geometry_from is provided, grab that info
+        if 'geometry_from' in global_block:
+            assert 'shape' not in global_block and 'wcs_from' not in global_block and 'nside' not in global_block, \
+                'Path to geometry, and shape, path to wcs, or nside provided; ambiguous'
+            if verbose:
+                print(f'Reading map geometry from path {global_block["geometry_from"]}')
+            geometry = utils.read_geometry_from(global_block['geometry_from'], healpix)
+
+            # get the geometry-like objects for car vs. healpix
+            try:
+                shape, wcs = geometry # car
+            except ValueError:
+                shape, wcs = geometry, None # healpix
+
+        # otherwise, grab shape and possibly wcs info
+        elif 'shape' in global_block:
+            assert not healpix, 'Maps in HEALPix; cannot supply shape or wcs in config'
+            assert 'geometry_from' not in global_block, \
+                'Path to geometry, and shape, path to wcs_provided; ambiguous'
+            if verbose:
+                print(f'Reading shape from config directly, found {global_block["shape"]}')
+            shape = literal_eval(global_block['shape'])
+
+            if verbose:
+                print(f'Reading wcs from path {global_block["wcs_from"]}')
+            _, wcs = utils.read_geometry_from(global_block['wcs_from'], healpix=False)
+
+        # otherwise, grab nside
+        elif 'nside' in global_block:
+            assert healpix, 'Maps in HEALPix; must supply nside if not path to geometry'
+            assert 'geometry_from' not in global_block, \
+                'Path to geometry, and nside; ambiguous'
+            if verbose:
+                print(f'Reading nside from config directly, found {global_block["nside"]}')
+            shape = tuple([hp.nside2npix(global_block['nside'])])
+            wcs = None
+
+        # otherwise, throw error
+        else:
+            raise ValueError('Must supply sufficient geometry information in the config')
+        shape = (len(polstr),) + shape
+        self._shape = shape
+        self._wcs = wcs
+
+        # optional attributes
+        self._dtype = global_block.get('dtype')
+        self._num_steps = global_block.get('num_steps')
+        self._max_N = global_block.get('max_N')
+
+    @property
+    def polstr(self):
+        return self._polstr
+
+    @property
+    def healpix(self):
+        return self._healpix
+
+    @property
+    def shape(self):
+        return self._shape
+
+    @property
+    def wcs(self):
+        return self._wcs
+
+    @property
+    def dtype(self):
+        return self._dtype
+
+    @property
+    def num_steps(self):
+        return self._num_steps
+    
+    @property
+    def max_N(self):
+        return self._max_N
 
 def eplot(x, *args, fname=None, show=False, **kwargs):
     """Return a list of enplot plots. Optionally, save and display them.

@@ -4,7 +4,7 @@ import os
 
 from pixell import enmap
 
-from tacos import data, utils, sky_models as models, config
+from tacos import data, utils, component, config
 
 class GibbsSampler:
 

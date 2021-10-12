@@ -1,12 +1,10 @@
-parameters:
+global:
     pol: QU 
     healpix: False
     geometry_from: '/projects/ACT/zatkins/data/ACTCollaboration/tacos/raw/act/map_pa4_f150_night_set0.fits'
     dtype: 'f4'
-    max_N: 4
-    prior_icovar_factor: 0.01
-    prior_offset: 100
     num_steps: 100
+    max_N: 4
 
 channels:
     wmap:
@@ -96,8 +94,9 @@ components:
         prior: 
             model: SimplePixelNoiseModel
             values:
-                mean: 0. 
                 model: 10. 
+                mean: 0. 
+            cov_mult_fact: 1.
     synch:
         sed: Synch
         nu0: 23e9
