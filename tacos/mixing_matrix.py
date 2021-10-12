@@ -4,7 +4,7 @@ import os
 
 from pixell import enmap
 
-from tacos import data, utils, models, config
+from tacos import data, utils, sky_models as models, config
 
 module_config = utils.config_from_yaml_resource('configs/mixing_matrix.yaml')
 
@@ -25,11 +25,11 @@ class Element:
         order = method_order_key[method]
 
         # get span of each param(s) in the component
-        model_name = component.model.__class__.__name__
+        sed_name = component.sed.__class__.__name__
 
         spans = {}
         for param in component.params:
-            comp_block = module_config['interpolation'][model_name][param]
+            comp_block = module_config['interpolation'][sed_name][param]
             low = comp_block['low']
             high = comp_block['high']
             N = comp_block['N']
@@ -38,32 +38,32 @@ class Element:
         # build interpolator
         nu = channel.bandpass.nu
 
-        # model has no non-linear parameters
+        # sed has no non-linear parameters
         if len(spans) == 0:
-            signal = component.model(nu)
+            signal = component.sed(nu)
             y = channel.bandpass.integrate_signal(signal) # this is one number!
             def interpolator(*args, **kwargs):
                 return y
             interpolator_call_kwargs = {}
 
-        # model has one non-linear parameter
+        # sed has one non-linear parameter
         elif len(spans) == 1:
-            signal = component.model(nu, **spans)
+            signal = component.sed(nu, **spans)
             y = channel.bandpass.integrate_signal(signal) # this will have shape len(spans.values()[0])
             interpolator = interp.interp1d(*spans.values(), y, kind=method, bounds_error=True)
             interpolator_call_kwargs = {}
 
-        # model has two non-linear parameter
+        # sed has two non-linear parameter
         elif len(spans) == 2:
             meshed_spans = np.meshgrid(*spans.values(), indexing='ij', sparse=True)
             meshed_spans = {k: v for k, v in zip(spans.keys(), meshed_spans)}
-            signal = component.model(nu, **meshed_spans) 
+            signal = component.sed(nu, **meshed_spans) 
             y = channel.bandpass.integrate_signal(signal) # shape is (len(spans.values()[0]), len(spans.values()[1]))
             interpolator = interp.RectBivariateSpline(*spans.values(), y, kx=order, ky=order)
             interpolator_call_kwargs = {'grid': False}
 
         else:
-            raise NotImplementedError('Only up to 2-parameter models implemented so far')
+            raise NotImplementedError('Only up to 2-parameter seds implemented so far')
 
         self.interpolator = interpolator
         self.interpolator_call_kwargs = interpolator_call_kwargs
@@ -88,6 +88,8 @@ class Element:
 class MixingMatrix:
     
     def __init__(self, channels, components, shape, wcs=None, dtype=np.float32):
+
+        # shape is map shape, ie (npol, ny, nx) or (npol, npix) or (npol, nalm)
 
         self._channels = channels
         self._components = components
@@ -166,10 +168,10 @@ def _load_all_from_config(config_path, load_channels=True, load_components=True,
     channels = []
     if load_channels:
         for instr, bands in config['channels'].items():
-            for band, kwargs in bands.items():
-                if kwargs == 'None':
-                    kwargs = {}
-                channels.append(data.Channel(instr, band, **kwargs))
+            for band, channel_kwargs in bands.items():
+                if (channel_kwargs is None) or (channel_kwargs == 'None'):
+                    channel_kwargs = {}
+                channels.append(data.Channel(instr, band, **channel_kwargs))
             
     # get list of components
     components = []

@@ -1,12 +1,8 @@
-from pixell import enmap
 import numpy as np
-import healpy as hp 
 
-from tacos import constants as cs, units, utils, broadcasting
+from tacos import utils
 
 from abc import ABC, abstractmethod
-from ast import literal_eval
-import os
 
 
 class LinSampler(ABC):
@@ -17,25 +13,7 @@ class LinSampler(ABC):
 
     # TODO: some data channels might be correlated, and therefore share a noise model!
 
-    # TODO: using an mnms.mnms.NoiseModel instance presumes we are in the 
-    # pixel basis. Therefore a "SingleBasis" sampler is necessarily a pixel-diagonal
-    # sampler, as opposed to eg a harmonic basis sampler (possibly). Maybe this
-    # can be generalized? If so, to what: harmonic, tiled, wavelet bases?
-    
-    # TODO: is it possible to have a mixing matrix and beam be exactly represented
-    # in a harmonic, tiled, or wavelet basis?
-    #
-    # >>>I think a mixing matrix might be well-defined in harmonic space, which 
-    # would eliminate one alm2map transform. If transform data to harmonic space,
-    # then eliminates all SHTs associated with beam, and only leaves those in
-    # noise model. There are more alms than pixels though. Seljebotn states that
-    # it's best to do this still in the pixel domain but using GL pixels...
-    #
-    # >>>I think a beam function B_ell might be well-defined as a special case of
-    # the last two bases (where the tiled or wavelet power is unity, and B_ell
-    # given in global harmonic filter)
-
-    def __init__(self, mixing_matrix, noise_models, data, prior_models=None, priors=None, dtype=np.float32):
+    def __init__(self, mixing_matrix, noise_models, data, prior_models=None, prior_means=None, dtype=np.float32):
         self._mixing_matrix = mixing_matrix
         self._noise_models = noise_models
         self._prior_models = prior_models
@@ -51,12 +29,13 @@ class LinSampler(ABC):
         self._Ninvd = np.array([noise_models[i].filter(data[i]) for i in range(num_chan)], dtype=dtype)
 
         # if prior, save prior-filtered priors, which we only need to calculate once
-        if priors is not None:
+        if prior_means is not None:
             assert prior_models, 'Supplied priors with prior_models, this is not allowed'
-            self._Sinvm = np.array([prior_models[i].filter(priors[i]) for i in range(num_comp)], dtype=dtype)
+            self._Sinvm = np.array([prior_models[i].filter(prior_means[i]) for i in range(num_comp)], dtype=dtype)
         else:
             self._Sinvm = None
         
+        # sanity checks
         assert len(noise_models) == num_chan, \
             f'noise_models must be an iterable over {num_chan} elements, got {len(noise_models)} instead'
         assert len(data) == num_chan, \
@@ -64,9 +43,9 @@ class LinSampler(ABC):
         if prior_models:
             assert len(prior_models) == num_comp, \
                 f'prior_models must be an iterable over {num_comp} elements, got {len(prior_models)} instead'
-        if priors:
-            assert len(priors) == num_comp, \
-                f'priors must be an iterable over {num_comp} elements, got {len(priors)} instead'
+        if prior_means:
+            assert len(prior_means) == num_comp, \
+                f'priors must be an iterable over {num_comp} elements, got {len(prior_means)} instead'
         assert mixing_matrix.dtype == dtype, \
             f'Mixing matrix dtype {mixing_matrix.dtype} does not match provided dtype {self._dtype}'
 

@@ -187,33 +187,43 @@ def config_from_yaml_resource(resource):
 data_paths = config_from_yaml_file(os.environ['HOME'] + '/.soapack.yml')['tacos']
 extensions = config_from_yaml_resource('configs/data.yaml')['extensions']
 
-def data_fn_str(type=None, instr=None, band=None, id=None, set=None, notes=None):
-    """Returns a generic data filename, of format '{type}_{instr}_{band}_{id}_{set}{notes}.{ext}'
-    """
+def data_fn_str(product=None, instr=None, band=None, id=None, set=None, notes=None):
+    """Returns a generic data filename, of format '{product}_{instr}_{band}_{id}_{set}{notes}.{ext}'"""
     if not notes:
         notes = ''
     else:
         notes = '_' + notes
-    data_fn_str_template = '{type}_{instr}_{band}_{id}_{set}{notes}.{ext}'
+    data_fn_str_template = '{product}_{instr}_{band}_{id}_{set}{notes}.{ext}'
     return data_fn_str_template.format(
-        type=type, instr=instr, band=band, id=id, set=set, notes=notes, ext=extensions[type]
+        product=product, instr=instr, band=band, id=id, set=set, notes=notes, ext=extensions[product]
         )
 
 def data_dir_str(product, instr=''):
-    """Returns a generic data directory, of format '{product_dir}{instr}/'
-    """
+    """Returns a generic data directory, of format '{product_dir}{instr}/'"""
     data_dir_str_template = '{product_dir}{instr}/'
     product_dir = data_paths[f'{product}_path']
     return data_dir_str_template.format(
         product_dir=product_dir, instr=instr
     )
 
+def data_fullpath_str(product=None, instr=None, band=None, id=None, set=None, notes=None):
+    path = data_dir_str(product, instr)
+    path += data_fn_str(product, instr, band, id, set, notes)
+    return path
+
+def polstr2polidxs(polstr):
+    if polstr:
+        polidxs = np.array(['IQU'.index(char) for char in polstr])
+    else:
+        polidxs = np.arange(3)
+    return polidxs
+
 def read_geometry_from(s, healpix=False):
     """Return geometry from a file s. Shape trimmed to return only map axes.
     """
     if healpix:
         shape = hp.read_map(s).shape
-        return hp.npix2nside(shape[-1]) # just want the map shape, no pol
+        return (shape[-1],) # just want the map shape, no pol
     else:
         shape, wcs = enmap.read_map_geometry(s)
         return shape[-2:], wcs # just want the map shape, no pol
@@ -236,7 +246,7 @@ def parse_parameters_block(params_block, verbose=True):
     Some keys in params_block are required. These are:
         
         healpix : bool
-        pol : a string in {IQU | IQ | IU | IQ | QU | I | Q | U}
+        pol : a string in {IQU | IQ | IU | QU | I | Q | U}
 
     Some keys in params_block are members of a set, only one of which must be provided:
 
@@ -248,6 +258,7 @@ def parse_parameters_block(params_block, verbose=True):
         max_N : integer number of max samples in chain
     """
     polstr = params_block['pol']
+    assert polstr in ['IQU', 'IQ', 'IU', 'QU', 'I', 'Q', 'U']
 
     # get whether to assume maps are in healpix
     healpix = params_block['healpix']
@@ -267,8 +278,7 @@ def parse_parameters_block(params_block, verbose=True):
         try:
             shape, wcs = geometry # car
         except ValueError:
-            nside, wcs = geometry, None # healpix
-            shape = tuple([hp.nside2npix(nside)]) # to get a tuple of length-1
+            shape, wcs = geometry, None # healpix
 
     # otherwise, grab shape and possibly wcs info
     elif 'shape' in params_block:
@@ -305,8 +315,39 @@ def parse_parameters_block(params_block, verbose=True):
         kwargs['max_N'] = params_block['max_N']
     return polstr, shape, wcs, kwargs
 
-def get_pol_indices(polstr):
-    return tuple('IQU'.index(p) for p in polstr)
+def parse_maplike_value(value, healpix, resource_path, dtype=np.float32, 
+                        scalar_verbose_str=None, fullpath_verbose_str=None, resource_verbose_str=None,
+                        verbose=False):
+    if isinstance(value, (int, float)):
+        if verbose:
+            print(scalar_verbose_str)
+        value = float(value)
+
+    # if string, first see if it exists as a fullpath to a file. if so, load it directly
+    elif isinstance(value, str):
+        if os.path.exists(value):
+            if verbose:
+                print(fullpath_verbose_str)
+            if healpix:
+                value = hp.read_map(value, field=None, dtype=np.float32)
+            else:
+                value = enmap.read_map(value)
+        
+        # if not fullpath, try loading it as a preexisting resource      
+        else:
+            if verbose:
+                print(resource_verbose_str)
+            if healpix:
+                value += '_healpix'
+
+            resource_fullpath = resource_path + value + '.' + extensions['resource']
+            if healpix:
+                value = hp.read_map(resource_fullpath, field=None, dtype=dtype)
+            else:
+                value = enmap.read_map(resource_fullpath)
+    
+    return value
+
 
 def eplot(x, *args, fname=None, show=False, **kwargs):
     """Return a list of enplot plots. Optionally, save and display them.
@@ -774,10 +815,3 @@ def fwhm_from_ell_bell(ell, bell):
     sigma = np.sqrt(-2 * np.log(bell) / (ell*(ell+1)))
     fwhm = sigma * np.sqrt(8 * np.log(2))
     return fwhm
-
-def polstr2polidxs(polstr):
-    if polstr:
-        polidxs = np.array(['IQU'.index(char) for char in polstr])
-    else:
-        polidxs = np.arange(3)
-    return polidxs
