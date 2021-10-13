@@ -118,11 +118,11 @@ class Chain:
             self._N += delta_N
             if self._N == self._max_N:
                 warnings.warn(f'Sample counter reached max of {self._max_N}; writing to {self._fname} and reseting')
-                self.write_samples(overwrite=False, reset=True)
+                self.write_samples(overwrite=False)
         else:
             warnings.warn(f'Sample counter would reach max of {self._max_N} if samples added; ' + \
                 f'writing to {self._fname} first, reseting, and then adding samples')
-            self.write_samples(overwrite=False, reset=True)
+            self.write_samples(overwrite=False)
             self.add_samples(weights=weights, amplitudes=amplitudes, params=params)
 
     def get_samples(self, sel=None):
@@ -213,7 +213,7 @@ class Chain:
                 f'expected {self._params[comp_name][param_name].shape[1:]}'
         self._params[comp_name][param_name][self._N:self._N + delta_N] = params
 
-    def write_samples(self, fname=None, name=None, overwrite=False, reset=False):
+    def write_samples(self, fname=None, name=None, overwrite=False):
         # allow the chain name to be the filename. fname (fullpath) takes
         # precedence over name
         if fname is None and name is None:
@@ -272,11 +272,10 @@ class Chain:
                 for comp, param in self.paramsiter():
                     params_dset[comp][param].write_direct(params[comp][param], dest_sel=np.s_[-self._N:])
 
-        if reset:
-            self.__init__(
-                self._components, self._shape, wcs=self._wcs, dtype=self._dtype,
-                fname=self._fname, name=self._name, max_N=self._max_N
-                )
+        self.__init__(
+            self._components, self._shape, wcs=self._wcs, dtype=self._dtype,
+            fname=self._fname, name=self._name, max_N=self._max_N
+            )
 
     def read_samples(self, fname=None, name=None):
         # allow the chain name to be the filename. fname (fullpath) takes
