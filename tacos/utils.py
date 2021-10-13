@@ -1,5 +1,5 @@
 # helper utility functions
-from pixell import enmap, curvedsky, utils
+from pixell import enmap, curvedsky
 from enlib import array_ops
 
 import healpy as hp 
@@ -186,9 +186,9 @@ def config_from_yaml_resource(resource):
 
 def config_from_yaml(filename_or_resource):
     try:
-        config = utils.config_from_yaml_resource(filename_or_resource)
+        config = config_from_yaml_resource(filename_or_resource)
     except FileNotFoundError:
-        config = utils.config_from_yaml_file(filename_or_resource)
+        config = config_from_yaml_file(filename_or_resource)
     return config
 
 data_paths = config_from_yaml_file(os.environ['HOME'] + '/.soapack.yml')['tacos']
@@ -208,7 +208,12 @@ def data_fn_str(product=None, instr=None, band=None, id=None, set=None, notes=No
 def data_dir_str(product, instr=''):
     """Returns a generic data directory, of format '{product_dir}{instr}/'"""
     data_dir_str_template = '{product_dir}{instr}/'
+    
+    # there are multiple kinds of covmat products
+    if product in ['icovar']:
+        product = 'covmat'
     product_dir = data_paths[f'{product}_path']
+    
     return data_dir_str_template.format(
         product_dir=product_dir, instr=instr
     )
@@ -321,7 +326,7 @@ class GlobalConfigBlock:
                 'Path to geometry, and shape, path to wcs, or nside provided; ambiguous'
             if verbose:
                 print(f'Reading map geometry from path {global_block["geometry_from"]}')
-            geometry = utils.read_geometry_from(global_block['geometry_from'], healpix)
+            geometry = read_geometry_from(global_block['geometry_from'], healpix)
 
             # get the geometry-like objects for car vs. healpix
             try:
@@ -340,7 +345,7 @@ class GlobalConfigBlock:
 
             if verbose:
                 print(f'Reading wcs from path {global_block["wcs_from"]}')
-            _, wcs = utils.read_geometry_from(global_block['wcs_from'], healpix=False)
+            _, wcs = read_geometry_from(global_block['wcs_from'], healpix=False)
 
         # otherwise, grab nside
         elif 'nside' in global_block:

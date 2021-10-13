@@ -19,20 +19,23 @@ template_path = utils.data_dir_str('template')
 @noise_models.register(registry=REGISTERED_NOISE_MODELS)
 class SimplePixelNoiseModel:
 
+    # TODO: handle more than polarization correlations? ie, channel correlations
+
     def __init__(self, inv_cov_mat, shape=None, dtype=None, polstr=None, cov_mult_fact=None):
-        
+        dtype = dtype if dtype else np.float32
+
         # cast inv_cov_mat to array of correct dtype and shape
         inv_cov_mat = np.asarray(inv_cov_mat, dtype=dtype)
-        assert inv_cov_mat.ndim == 4, \
-            'Inverse covariance for a single dataset/prior must have shape (npol, npol, ny, nx)'
-        
-        # post-process: slice out pol indices, multiply by cov_mult_factor
-        self._polidxs = utils.polstr2polidxs(polstr)
         if shape is not None:
-            shape = (len(self._polidxs), len(self._polidxs), *shape[-2:])
-            inv_cov_mat = np.broadcast_to(inv_cov_mat, shape, subok=True)
-        else:
-            inv_cov_mat = inv_cov_mat[np.ix_(self._polidxs, self._polidxs)]
+            inv_cov_mat = self._massage_input(inv_cov_mat, shape[-2:])
+        
+        # slice out pol dimensions
+        self._polidxs = utils.polstr2polidxs(polstr)
+        inv_cov_mat = inv_cov_mat[np.ix_(self._polidxs, self._polidxs)]
+        assert inv_cov_mat.ndim == 4, \
+            'Inverse covariance for a single dataset/prior must have shape (npol, npol, ny, nx)'    
+        
+        # scale covariance by mult_fact if provided
         if cov_mult_fact is None:
             cov_mult_fact = 1.
         inv_cov_mat /= cov_mult_fact # cov_mult_fact applies to covariance!
@@ -41,6 +44,53 @@ class SimplePixelNoiseModel:
         self._shape = self.model.shape
         self._dtype = dtype if dtype else np.float32
         self._cov_mult_fact = cov_mult_fact
+
+    def _massage_input(self, arr, shape):
+        """Put input array into correct shape, which is (3, 3, ny, nx). If
+        arr.ndim is not 4, fill the diagonals of the output with arr.
+
+        Parameters
+        ----------
+        arr : array-like or scalar
+            Input to be reshaped.
+        shape : iterable
+            Length-2 iterable containing (ny, nx). Actively used if arr is
+            scalar or 1-d. Checks for compatibility if arr is >1-d.
+
+        Returns
+        -------
+        array-like
+            Shape (3, 3, ny, nx) representation of input, with input along
+            axes=(0,1) diagonal if input dimension is less than 4.
+
+        Raises
+        ------
+        ValueError
+            If input dimension is greater than 4.
+        """
+        assert len(shape) == 2
+        arr = np.atleast_1d(arr)
+        indim = arr.ndim
+        if indim > 4:
+            raise ValueError(f'Input array has dimension {indim}, expected <= 4')
+        elif indim == 1:
+            if arr.size > 1:
+                # assume along main diagonal
+                arr = arr.reshape(arr.size, 1, 1)
+                arr = np.broadcast_to(arr, (arr.size, *shape), subok=True)
+            else:
+                # scalar
+                arr = np.broadcast_to(arr, shape, subok=True)
+        assert arr.shape[-2:] == shape, \
+            f'Massaged array has (ny, nx) = {arr.shape[-2:]}, expected {shape}'
+
+        if indim == 4:
+            assert arr.shape[:2] == (3, 3), \
+                f'Massaged array has (npol, npol) = {arr.shape[:2]}, expected (3, 3)'
+            return arr
+        else:
+            # must broadcast in first dimension if arr.ndim == 3!
+            return np.eye(3, dtype=arr.dtype)[..., None, None] * arr
 
     def get_sim(self, split_num, sim_num, *str2seed_args):
         seed = (split_num, sim_num)

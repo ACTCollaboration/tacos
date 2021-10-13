@@ -13,6 +13,8 @@ class LinSampler(ABC):
 
     # TODO: some data channels might be correlated, and therefore share a noise model!
 
+    # TODO: as impleneted, either all components have priors/prior_means or none do 
+
     def __init__(self, mixing_matrix, noise_models, data, prior_models=None, prior_means=None, dtype=np.float32):
         self._mixing_matrix = mixing_matrix
         self._noise_models = noise_models

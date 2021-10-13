@@ -17,7 +17,7 @@ class Component:
                 param_broadcasters=None, param_shapes=None, comp_prior_model=None,
                 comp_prior_mean=None, param_priors=None, verbose=True):
         
-        self.sed = sed
+        self._sed = sed
         self._name = comp_name if comp_name else sed.__class__.__name__.lower()
 
         # store any fixed params, label all else active params
@@ -102,7 +102,7 @@ class Component:
 
         # can't use config.Config because that depends on sky_models.py, instead
         # use utils.GlobalConfigBlock because we only need a few global params
-        global_config_block = utils.GlobalConfigBlock(config_path)
+        global_config_block = utils.GlobalConfigBlock(config_path, verbose=verbose)
         polstr = global_config_block.polstr
         healpix = global_config_block.healpix
         shape = global_config_block.shape
@@ -127,6 +127,8 @@ class Component:
                 comp_block['broadcasters'], healpix,
                 comp_name=comp_name, sed_name=sed_name, verbose=verbose
                 )
+        else:
+            comp_broadcaster = None
 
         # get the component prior, if any
         if 'prior' in comp_block:
@@ -161,6 +163,9 @@ class Component:
                     verbose=verbose
                     )
                 comp_prior_mean = np.broadcast_to(comp_prior_mean, shape, subok=True)
+        else:
+            comp_prior_model = None
+            comp_prior_mean = None
 
         # get the possible fixed params, broadcasting function stack for each param, and shapes
         # of each param

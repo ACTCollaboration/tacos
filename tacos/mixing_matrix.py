@@ -96,7 +96,7 @@ class MixingMatrix:
         num_comp = len(components)
 
         self._element_shape = shape
-        utils.check_shape(self.shape)
+        utils.check_shape(shape)
 
         self._wcs = wcs # if this is None, return array as-is (ie, healpix), see matrix property
         self._dtype = dtype if dtype else np.float32

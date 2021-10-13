@@ -33,7 +33,7 @@ class Config:
                     )  
 
         # get pol, shape, wcs, dtype, ...
-        global_config_block = utils.GlobalConfigBlock(config_dict['global'], verbose=verbose)
+        global_config_block = utils.GlobalConfigBlock(config_path, verbose=verbose)
 
         self._polstr = global_config_block.polstr 
         self._healpix = global_config_block.healpix
@@ -49,7 +49,7 @@ class Config:
 
     @property
     def channels(self):
-        return self._components
+        return self._channels
 
     @property
     def components(self):

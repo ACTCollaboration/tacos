@@ -136,7 +136,7 @@ class Channel:
         if self.correlated_noise:
             pass
         else:
-            inv_cov_mat_path = utils.data_fullpath_str('covmat', instr, band, id, set, notes)
+            inv_cov_mat_path = utils.data_fullpath_str('icovar', instr, band, id, set, notes)
             inv_cov_mat = enmap.read_map(inv_cov_mat_path)
             SimplePixelNoiseModel = noise_models.REGISTERED_NOISE_MODELS['SimplePixelNoiseModel']
             self._noise_model = SimplePixelNoiseModel(
