@@ -23,7 +23,7 @@ class Channel:
 
     def __init__(self, instr, band, id=None, set=None, notes=None, polstr=None, pysm_notes=None,
                     correlated_noise=False, pysm=False, healpix=False, cmb=False, cmb_kwargs=None,
-                    sim_num=None, mult_fact=1, beam_kwargs=None, bandpass_kwargs=None, **kwargs):
+                    sim_num=None, cov_mult_fact=1, beam_kwargs=None, bandpass_kwargs=None, **kwargs):
         """Channel instance holding map data, covariance data, bandpasses, and beams. 
 
         Parameters
@@ -62,8 +62,8 @@ class Channel:
             Whether to add a noise realization to the map (None does not). int will help
             set the seed of the realization through NoiseModel.get_sim(sim_num=noise). 
             Raises exception if pysm is False. Default is None.
-        mult_fact: int, optional
-            Multiply the noise inverse covariance by this factor (for testing), by default 1
+        cov_mult_fact: int, optional
+            Multiply the noise covariance by this factor (for testing), by default 1
         beam_kwargs : dict, optional
             kwargs to pass to beam.load_<instrument>_beam, by default None
         bandpass_kwargs : dict, optional
@@ -95,7 +95,7 @@ class Channel:
         self.set = set
         self.notes = notes
         self._polidxs = utils.polstr2polidxs(polstr)
-        self.correlated_noise = correlated_noise
+        self._correlated_noise = correlated_noise
         if self.correlated_noise:
             raise NotImplementedError('Correlated noise not yet implemented')
         self.pysm = pysm
@@ -132,12 +132,16 @@ class Channel:
             raise AssertionError("How did we end up here?")
         self._map = self._map[self._polidxs]
         
-        # add optional mult_fact from noise_kwargs
+        # add optional cov_mult_fact from noise_kwargs
         if self.correlated_noise:
             pass
         else:
+            inv_cov_mat_path = utils.data_fullpath_str('icovar', instr, band, id, set, notes)
+            inv_cov_mat = enmap.read_map(inv_cov_mat_path)
             SimplePixelNoiseModel = noise_models.REGISTERED_NOISE_MODELS['SimplePixelNoiseModel']
-            self._noise_model = SimplePixelNoiseModel.load_from_channel(self, polstr=polstr, mult_fact=mult_fact)
+            self._noise_model = SimplePixelNoiseModel(
+                inv_cov_mat, dtype=inv_cov_mat.dtype, polstr=polstr, cov_mult_fact=cov_mult_fact
+                )
 
         # beams
         beam_path = utils.data_fullpath_str('beam', instr, 'all', id, 'all', notes)
@@ -176,7 +180,7 @@ class Channel:
 
         if sim_num is not None:
             assert pysm, 'Can only add a noise realization to a simulated map'
-            if self.correlated_noise:
+            if self._correlated_noise:
                 self._map += self._noise_model.get_sim(
                     self._split_num, sim_num
                     )
@@ -210,4 +214,4 @@ class Channel:
 
     @property
     def correlated_noise(self):
-        return self.correlated_noise
+        return self._correlated_noise

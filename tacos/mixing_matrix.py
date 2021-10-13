@@ -1,10 +1,9 @@
 import numpy as np
 from scipy import interpolate as interp
-import os
 
 from pixell import enmap
 
-from tacos import data, utils, sky_models as models, config
+from tacos import utils, config
 
 module_config = utils.config_from_yaml_resource('configs/mixing_matrix.yaml')
 
@@ -87,7 +86,7 @@ class Element:
 
 class MixingMatrix:
     
-    def __init__(self, channels, components, shape, wcs=None, dtype=np.float32):
+    def __init__(self, channels, components, shape, wcs=None, dtype=None):
 
         # shape is map shape, ie (npol, ny, nx) or (npol, npix) or (npol, nalm)
 
@@ -97,10 +96,10 @@ class MixingMatrix:
         num_comp = len(components)
 
         self._element_shape = shape
-        utils.check_shape(self.shape)
+        utils.check_shape(shape)
 
         self._wcs = wcs # if this is None, return array as-is (ie, healpix), see matrix property
-        self._dtype = dtype
+        self._dtype = dtype if dtype else np.float32
 
         self._elements = {}
         for comp in components:
@@ -132,8 +131,13 @@ class MixingMatrix:
 
     @classmethod
     def load_from_config(cls, config_path, verbose=True):
-        _, channels, components, _, shape, wcs, kwargs = _load_all_from_config(config_path, verbose=verbose)
-        return cls(channels, components, shape, wcs, **kwargs)
+        config_obj = config.Config(config_path, verbose=verbose)
+        channels = config_obj.channels
+        components = config_obj.components
+        shape = config_obj.shape
+        wcs = config_obj.wcs
+        dtype = config_obj.dtype
+        return cls(channels, components, shape, wcs=wcs, dtype=dtype)
 
     @property
     def channels(self):
@@ -157,36 +161,6 @@ class MixingMatrix:
             return self._matrix
         else:
             return enmap.ndmap(self._matrix, self._wcs)
-
-def _load_all_from_config(config_path, load_channels=True, load_components=True, verbose=True):
-    try:
-        config = utils.config_from_yaml_resource(config_path)
-    except FileNotFoundError:
-        config = utils.config_from_yaml_file(config_path)
-
-    # get list of channels
-    channels = []
-    if load_channels:
-        for instr, bands in config['channels'].items():
-            for band, channel_kwargs in bands.items():
-                if (channel_kwargs is None) or (channel_kwargs == 'None'):
-                    channel_kwargs = {}
-                channels.append(data.Channel(instr, band, **channel_kwargs))
-            
-    # get list of components
-    components = []
-    if load_components:
-        for comp_name in config['components']:
-            components.append(models.Component.load_from_config(config_path, comp_name, verbose=verbose))  
-
-    # get pol, shape, wcs, dtype
-    params_block = config['parameters']
-    polstr, shape, wcs, kwargs = utils.parse_parameters_block(params_block, verbose=verbose)
-
-    # get name from config stem
-    config_base, _ = os.path.splitext(config_path)
-    name = os.path.basename(config_base)
-    return name, channels, components, polstr, shape, wcs, kwargs
 
 def get_exact_mixing_matrix(channels, components, shape, wcs=None, dtype=np.float32):
     '''
