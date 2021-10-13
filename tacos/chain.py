@@ -13,38 +13,27 @@ chain_path = utils.data_dir_str('chain')
 
 class Chain:
 
-    @classmethod
-    def load_from_config(cls, config_path, verbose=False):
-        config_obj = config.Config(config_path, load_channels=False, verbose=verbose)
-        components = config_obj.components
-        shape = config_obj.shape
-        wcs = config_obj.wcs
-        dtype = config_obj.dtype
-        name = config_obj.name
-        max_N = config_obj.max_N
-        return cls(components, shape, wcs=wcs, dtype=dtype, name=name, max_N=max_N)
-
-    def __init__(self, components, shape, wcs=None, dtype=np.float32, fname=None, name=None, max_N=1000):
+    def __init__(self, components, shape, wcs=None, dtype=None, fname=None, name=None, max_N=None):
         
         ncomp = len(components)
         self._components = components
         self._shape = shape
         utils.check_shape(self._shape)
         self._wcs = wcs # if this is None, return array as-is (ie, healpix), see amplitudes property
-        self._dtype = dtype
+        self._dtype = dtype if dtype else 1000
         self._fname = self._get_fname(fname=fname, name=name)
         self._name = name # used for writing to disk if fname not provided
-        self._max_N = max_N # maximum array size. once reached, chain is dumped
+        self._max_N = max_N if max_N else 1000 # maximum array size. once reached, chain is dumped
         self._N = 0 # current sample counter
 
         # initialize chain info, this is just weights and -2logposts
-        self._weights = np.full((max_N, 2), np.nan, dtype=dtype)
+        self._weights = np.full((self._max_N, 2), np.nan, dtype=self._dtype)
 
         # initialize amplitudes
         # amplitudes are a single array, with outermost axis for components
-        self._amplitudes = np.full((max_N, ncomp, *self.shape), np.nan, dtype=dtype)
+        self._amplitudes = np.full((self._max_N, ncomp, *self.shape), np.nan, dtype=self._dtype)
         if wcs is not None:
-            self._amplitudes = enmap.enmap(self._amplitudes, wcs=wcs, dtype=dtype, copy=False)
+            self._amplitudes = enmap.ndmap(self._amplitudes, wcs=wcs)
 
         # for each component with active parameters, store parameters separately.
         self._params = self.get_empty_params_sample()
@@ -53,7 +42,7 @@ class Chain:
                 shape = comp.param_shapes[param]
             else:
                 shape = self.shape
-            self._params[comp.name][param] = np.full((max_N, *shape), np.nan, dtype=dtype)
+            self._params[comp.name][param] = np.full((self._max_N, *shape), np.nan, dtype=self._dtype)
 
     def _get_fname(self, fname=None, name=None):
         # allow the chain name to be the filename
@@ -297,7 +286,7 @@ class Chain:
         else:
             fname = self._get_fname(fname, name)
 
-        # currently this reads all sampls
+        # currently this reads all samples
         with h5py.File(fname, 'r') as hfile:
             weights_dset = hfile['samples/weights']
             weights = np.empty(weights_dset.shape, weights_dset.dtype)
@@ -326,3 +315,14 @@ class Chain:
     @property
     def name(self):
         return self._name
+
+    @classmethod
+    def load_from_config(cls, config_path, verbose=True):
+        config_obj = config.Config(config_path, load_channels=False, verbose=verbose)
+        components = config_obj.components
+        shape = config_obj.shape
+        wcs = config_obj.wcs
+        dtype = config_obj.dtype
+        name = config_obj.name
+        max_N = config_obj.max_N
+        return cls(components, shape, wcs=wcs, dtype=dtype, name=name, max_N=max_N)
