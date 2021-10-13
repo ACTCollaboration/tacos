@@ -2,7 +2,7 @@ from pixell import enmap, wcsutils
 import h5py
 import numpy as np
 
-from tacos import utils, mixing_matrix as M
+from tacos import utils, config
 
 import warnings
 import os
@@ -15,8 +15,14 @@ class Chain:
 
     @classmethod
     def load_from_config(cls, config_path, verbose=False):
-        name, _, components, _, shape, wcs, kwargs = M._load_all_from_config(config_path, load_channels=False, verbose=verbose)
-        return cls(components, shape, wcs, name=name, **kwargs)
+        config_obj = config.Config(config_path, load_channels=False, verbose=verbose)
+        components = config_obj.components
+        shape = config_obj.shape
+        wcs = config_obj.wcs
+        dtype = config_obj.dtype
+        name = config_obj.name
+        max_N = config_obj.max_N
+        return cls(components, shape, wcs=wcs, dtype=dtype, name=name, max_N=max_N)
 
     def __init__(self, components, shape, wcs=None, dtype=np.float32, fname=None, name=None, max_N=1000):
         

@@ -11,7 +11,7 @@ class GibbsSampler:
     # Holds metadata about the sampling run, as well as the necessary objects: a Chain, 
     # MixingMatrix, LinSampler, and NonLinSampler (possibly)
 
-    def __init__(self, chain, mixing_matrix, linsampler, nonlinsampler=None, init_amplitudes=None,
+    def __init__(self, chain, mixing_matrix, linsampler=None, nonlinsampler=None, init_amplitudes=None,
                  num_steps=1000, dtype=np.float32):
         self._chain = chain
         self._mixing_matrix = mixing_matrix
