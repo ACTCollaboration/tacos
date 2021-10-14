@@ -16,3 +16,4 @@ class NonLinSampler(ABC):
 
         # use scipy.stats.rv objects for priors?
         # prior_rvs would need to be a dict matching the mapping of params
+        pass

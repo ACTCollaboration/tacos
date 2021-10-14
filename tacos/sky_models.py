@@ -6,12 +6,6 @@ from abc import ABC, abstractmethod
 
 REGISTERED_SEDS = {}
 
-def register(registry=REGISTERED_SEDS):
-    """Add a concrete SED implementation to the specified registry (dictionary)."""
-    def decorator(sed_class):
-        registry[sed_class.__name__] = sed_class
-        return sed_class
-    return decorator
 
 class SED(ABC):
 
@@ -36,7 +30,7 @@ class SED(ABC):
     def __call__(self, nu, **kwargs):
         pass
 
-@register()
+@utils.register(REGISTERED_SEDS)
 class Dust(SED):
     
     def __init__(self, nu0=353e9, **kwargs):
@@ -50,7 +44,7 @@ class Dust(SED):
     def __call__(self, nu, **kwargs):
         return modified_blackbody_ratio(nu, self.nu0, **kwargs)
 
-@register()
+@utils.register(REGISTERED_SEDS)
 class Synch(SED):
 
     def __init__(self, nu0=30e9, **kwargs):
@@ -64,7 +58,7 @@ class Synch(SED):
     def __call__(self, nu, **kwargs):
         return power_law_ratio(nu, self.nu0, **kwargs)
 
-@register()
+@utils.register(REGISTERED_SEDS)
 class CMB(SED):
 
     def __init__(self, nu0=100e9, **kwargs):

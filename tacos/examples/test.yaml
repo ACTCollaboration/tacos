@@ -4,7 +4,7 @@ global:
     geometry_from: '/projects/ACT/zatkins/data/ACTCollaboration/tacos/raw/act/map_pa4_f150_night_set0.fits'
     dtype: 'f4'
     num_steps: 100
-    max_N: 4
+    linsampler: SingleBasis
 
 channels:
     wmap:
@@ -88,18 +88,24 @@ components:
         sed: Dust
         params:
             beta:
-                shape: (1,)
+                value: pysm_Dust_beta
             T:
-                shape: (1,)
+                value: pysm_Dust_T
         prior: 
-            model: SimplePixelNoiseModel
+            noise_model: SimplePixelNoiseModel
             values:
-                model: 10. 
-                mean: 0. 
+                noise_model: 1. 
+                mean: 69. 
             cov_mult_fact: 1.
     synch:
         sed: Synch
         nu0: 23e9
         params:
             beta:
-                shape: (1,)
+                value: pysm_Synch_beta  
+        prior:
+            noise_model: SimplePixelNoiseModel
+            values:
+                noise_model: 1. 
+                mean: 420. 
+            cov_mult_fact: 1.   

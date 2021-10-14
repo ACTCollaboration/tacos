@@ -5,6 +5,9 @@ from tacos import utils
 from abc import ABC, abstractmethod
 
 
+REGISTERED_SAMPLERS = {}
+
+
 class LinSampler(ABC):
 
     # a linear sampler depends on a tacos.tacos.MixingMatrix instance and an
@@ -13,13 +16,11 @@ class LinSampler(ABC):
 
     # TODO: some data channels might be correlated, and therefore share a noise model!
 
-    # TODO: as impleneted, either all components have priors/prior_means or none do 
-
-    def __init__(self, mixing_matrix, noise_models, data, prior_models=None, prior_means=None, dtype=np.float32):
+    def __init__(self, mixing_matrix, noise_models, data, prior_models=None, prior_means=None, dtype=None):
         self._mixing_matrix = mixing_matrix
         self._noise_models = noise_models
         self._prior_models = prior_models
-        self._dtype = dtype
+        self._dtype = dtype if dtype else np.float32
 
         num_chan, num_comp, num_pol = self._mixing_matrix.shape[:3]
         self._num_chan = num_chan
@@ -42,28 +43,26 @@ class LinSampler(ABC):
             f'noise_models must be an iterable over {num_chan} elements, got {len(noise_models)} instead'
         assert len(data) == num_chan, \
             f'data must be an iterable over {num_chan} elements, got {len(data)} instead'
-        if prior_models:
+        if prior_models is not None:
             assert len(prior_models) == num_comp, \
                 f'prior_models must be an iterable over {num_comp} elements, got {len(prior_models)} instead'
-        if prior_means:
+        if prior_means is not None:
             assert len(prior_means) == num_comp, \
                 f'priors must be an iterable over {num_comp} elements, got {len(prior_means)} instead'
         assert mixing_matrix.dtype == dtype, \
             f'Mixing matrix dtype {mixing_matrix.dtype} does not match provided dtype {self._dtype}'
 
-    def __call__(self, noise_seed=None, prior_seed=None, M=None, chain=None, iteration=-1, **comp_params):
-        # get the mixing matrix for this call, if not provided
-        if not M:
-            M = self._mixing_matrix(chain=chain, iteration=iteration, **comp_params)
-        
+    def __call__(self, M, noise_seed=None, prior_seed=None):
         # get random samples for noise and prior (if any)
         eta_d = utils.concurrent_standard_normal(
-            size=(self._num_chan, *self._mixing_matrix.element_shape), seed=noise_seed, dtype=self._dtype
+            size=(self._num_chan, *self._mixing_matrix.element_shape), 
+            seed=noise_seed, dtype=self._dtype, nthread=4
             )
 
-        if self._prior_models:
-            eta_d = utils.concurrent_standard_normal(
-                size=(self._num_comp, *self._mixing_matrix.element_shape), seed=prior_seed, dtype=self._dtype
+        if self._prior_models is not None:
+            eta_s = utils.concurrent_standard_normal(
+                size=(self._num_comp, *self._mixing_matrix.element_shape),
+                seed=prior_seed, dtype=self._dtype, nthread=4
                 )
         else:
             eta_s = None
@@ -77,8 +76,6 @@ class LinSampler(ABC):
     def _get_RHS(self, M, eta_d, eta_s=None):
         # TODO: implement correlated filtering
 
-        # TODO: if want to implement SHT basis, implement complex random draws
-
         # want to do this MN_invd = np.einsum('jca...,jab...,jb...->ca...', M, N_inv, d)
         # which is the same as the below
         # NOTE: because of the intermediate calculation, you double the floating point error
@@ -88,7 +85,7 @@ class LinSampler(ABC):
         RHS = np.einsum('jca...,ja...->ca...', M, self._Ninvd)
 
         # avoid this sum if Sinvm is 0
-        if self._Sinvm:
+        if self._Sinvm is not None:
             RHS += self._Sinvm
         
         # get the noise sample
@@ -98,7 +95,7 @@ class LinSampler(ABC):
         RHS += np.einsum('jca...,ja...->ca...', M, eta_d)
 
         # avoid prior sample if not necessary
-        if eta_s:
+        if eta_s is not None:
             eta_s = np.array(
                 [self._prior_models[i].filter(eta_s[i], power=-0.5) for i in range(self._num_comp)], dtype=self._dtype
                 )
@@ -111,26 +108,30 @@ class LinSampler(ABC):
         pass
           
 
+@utils.register(REGISTERED_SAMPLERS)
 class SingleBasis(LinSampler):
 
     # Take advantage of all objects being in the same basis to perform an "exact" inversion
     # of the amplitude sampling. This assumes of course that all objects are sufficiently
     # sparse even in this basis. Also makes same pixel-space assumption as base class (for now)
     
-    def __init__(self, mixing_matrix, noise_models, data, prior_models=None, priors=None, dtype=np.float32):
-        super().__init__(mixing_matrix, noise_models, data, prior_models=prior_models, priors=priors,
+    def __init__(self, mixing_matrix, noise_models, data, prior_models=None, prior_means=None, dtype=np.float32):
+        super().__init__(mixing_matrix, noise_models, data, prior_models=prior_models, prior_means=prior_means,
                             dtype=dtype)
         
         # prebuild LHS noise model arrays
         self._Ninv = np.array([noise_models[i].model for i in range(self._num_chan)], dtype=dtype)
-        if prior_models:
+        if prior_models is not None:
             self._Sinv = np.array([prior_models[i].model for i in range(self._num_comp)], dtype=dtype)
+            
+            # components priors are uncorrelated with one another, in this implementation
+            self._Sinv = np.einsum('cd, cab...->cadb...', np.eye(self._num_comp, dtype=self._dtype), self._Sinv)
         else:
             self._Sinv = None
 
     def _solve(self, M, RHS):
-        LHS = np.einsum('jca...,jab...,jdb...->cadb...', M, self._N_inv, M) # ncomp, npol, ncomp, npol
-        if self._Sinv:
+        LHS = np.einsum('jca...,jab...,jdb...->cadb...', M, self._Ninv, M) # ncomp, npol, ncomp, npol
+        if self._Sinv is not None:
             LHS += self._Sinv
         
         # we can explicitly invert!
@@ -139,13 +140,14 @@ class SingleBasis(LinSampler):
             )
         LHS = utils.eigpow(LHS, -1, axes=[0, 1])
         LHS = LHS.reshape(
-            self._num_comp*self._num_pol, self._num_comp*self._num_pol, *LHS.shape[4:]
+            self._num_comp, self._num_pol, self._num_comp, self._num_pol, *LHS.shape[2:]
             )
 
         # now solve
         return np.einsum('cadb...,ca...->db...', LHS, RHS)
 
 
+@utils.register(REGISTERED_SAMPLERS)
 class MixedBasis(LinSampler):
 
     # This must solve the sampling equation iteratively, assuming the basis transformations will

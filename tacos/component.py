@@ -29,7 +29,7 @@ class Component:
             fixed_params = {}
         for param in sed.params:
             val = fixed_params.get(param)
-            if val:
+            if val is not None:
                 self.fixed_params[param] = val
             else:
                 self.active_params.append(param)
@@ -132,12 +132,14 @@ class Component:
 
         # get the component prior, if any
         if 'prior' in comp_block:
-            # parse the prior model value
             prior_block = comp_block['prior']
-            value = prior_block['values']['model']
-            scalar_verbose_str = f'Fixing component {comp_name} prior model value to {float(value)}'
-            fullpath_verbose_str = f'Fixing component {comp_name} prior model value to data at {value}'
-            resource_verbose_str = f'Fixing component {comp_name} prior model value to {value} template'
+            prior_model_class = noise_models.REGISTERED_NOISE_MODELS[prior_block['noise_model']]
+
+            # parse the prior model value
+            value = prior_block['values']['noise_model']
+            scalar_verbose_str = f'Fixing component {comp_name} prior model {prior_model_class.__name__} value to {value}'
+            fullpath_verbose_str = f'Fixing component {comp_name} prior model {prior_model_class.__name__} value to data at {value}'
+            resource_verbose_str = f'Fixing component {comp_name} prior model {prior_model_class.__name__} value to {value} template'
             value = utils.parse_maplike_value(
                 value, healpix, template_path, dtype=dtype, scalar_verbose_str=scalar_verbose_str,
                 fullpath_verbose_str=fullpath_verbose_str, resource_verbose_str=resource_verbose_str,
@@ -145,7 +147,6 @@ class Component:
                 )
             
             # construct the prior model instance
-            prior_model_class = noise_models.REGISTERED_NOISE_MODELS[prior_block['model']]
             cov_mult_fact = prior_block.get('cov_mult_fact')
             comp_prior_model = prior_model_class(
                 value, shape=shape, dtype=dtype, polstr=polstr, cov_mult_fact=cov_mult_fact
@@ -154,7 +155,7 @@ class Component:
             # parse the prior mean, if any
             if 'mean' in prior_block['values']:
                 value = prior_block['values']['mean']
-                scalar_verbose_str = f'Fixing component {comp_name} prior mean value to {float(value)}'
+                scalar_verbose_str = f'Fixing component {comp_name} prior mean value to {value}'
                 fullpath_verbose_str = f'Fixing component {comp_name} prior mean value to data at {value}'
                 resource_verbose_str = f'Fixing component {comp_name} prior mean value to {value} template'
                 comp_prior_mean = utils.parse_maplike_value(
@@ -163,9 +164,15 @@ class Component:
                     verbose=verbose
                     )
                 comp_prior_mean = np.broadcast_to(comp_prior_mean, shape, subok=True)
+            else:
+                comp_prior_mean = np.broadcast_to(0, shape, subok=True).astype(dtype)
         else:
-            comp_prior_model = None
-            comp_prior_mean = None
+            if verbose:
+                print(f'Fixing component {comp_name} prior model to ZeroInformationNoiseModel')
+                print(f'Fixing component {comp_name} prior mean value to 0.0')
+            prior_model_class = noise_models.REGISTERED_NOISE_MODELS['ZeroInformationNoiseModel']
+            comp_prior_model = prior_model_class(shape, dtype=dtype, polstr=polstr)
+            comp_prior_mean = np.broadcast_to(0, shape, subok=True).astype(dtype)
 
         # get the possible fixed params, broadcasting function stack for each param, and shapes
         # of each param
@@ -182,9 +189,9 @@ class Component:
                 if 'value' in param_block:
                     assert 'shape' not in param_block, 'A fixed value cannot have a config-set shape'
                     value = param_block['value']
-                    scalar_verbose_str = f'Fixing component {comp_name} (model {sed_name}) param {param_name} to {float(value)}'
-                    fullpath_verbose_str = f'Fixing component {comp_name} (model {sed_name}) param {param_name} to data at {value}'
-                    resource_verbose_str = f'Fixing component {comp_name} (model {sed_name}) param {param_name} to {value} template'
+                    scalar_verbose_str = f'Fixing component {comp_name} (sed {sed_name}) param {param_name} to {value}'
+                    fullpath_verbose_str = f'Fixing component {comp_name} (sed {sed_name}) param {param_name} to data at {value}'
+                    resource_verbose_str = f'Fixing component {comp_name} (sed {sed_name}) param {param_name} to {value} template'
                     fixed_params[param_name] =  utils.parse_maplike_value(
                         value, healpix, template_path, dtype=dtype, scalar_verbose_str=scalar_verbose_str,
                         fullpath_verbose_str=fullpath_verbose_str, resource_verbose_str=resource_verbose_str,
@@ -206,13 +213,15 @@ class Component:
                         param_block['shape'],
                         comp_name=comp_name, sed_name=sed_name, param_name=param_name, verbose=verbose
                         )
+        if verbose:
+            print('\n')
 
         # get component
-        return cls(sed, comp_name=comp_name, comp_broadcaster=comp_broadcaster,
-                param_broadcasters=param_broadcasters, param_shapes=param_shapes, 
-                comp_prior_model=comp_prior_model, comp_prior_mean=comp_prior_mean,
-                verbose=verbose)
-    
+        return cls(sed, comp_name=comp_name, fixed_params=fixed_params,
+                comp_broadcaster=comp_broadcaster, param_broadcasters=param_broadcasters,
+                param_shapes=param_shapes, comp_prior_model=comp_prior_model,
+                comp_prior_mean=comp_prior_mean, verbose=verbose)
+
     # just helps modularize load_from_config(...)
     @classmethod
     def parse_broadcasters(cls, function_block, healpix,
@@ -229,7 +238,7 @@ class Component:
                 print(msg)
             
             # append the function to the list
-            broadcaster = getattr(broadcasting, func_name)
+            broadcaster = broadcasting.REGISTERED_FUNCS[func_name]
             func_list.append(broadcaster)
 
             # look for any kwargs, or append empty kwargs.

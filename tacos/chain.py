@@ -67,12 +67,10 @@ class Chain:
 
     def get_empty_params_sample(self):
         d = {}
-        for comp in self._components:
-            d[comp.name] = {}
         for comp, param in self.paramsiter():
+            if comp not in d:
+                d[comp] = {}
             d[comp][param] = None
-        assert len(d) == len(self._components), \
-            'At least one component has a repeated name, this is not allowed'
         return d
 
     def add_samples(self, weights=None, amplitudes=None, params=None):
@@ -80,7 +78,7 @@ class Chain:
             'All of weights, amplitudes, and params passed as None'
 
         if self._N > 0:
-            prev_weights, prev_amplitudes, prev_params = self.get_samples()
+            prev_weights, prev_amplitudes, prev_params = self.get_samples(sel=np.s_[-1 % self._N])
         
         # copy forward the previous sample. this will fail if counter at 0 since
         # names would not exist
@@ -128,7 +126,7 @@ class Chain:
     def get_samples(self, sel=None):
         if sel is None:
             assert self._N > 0, 'Cannot get samples from empty chain'
-            sel = np.s_[-1 % self._N] # get most recent *written* element
+            sel = np.s_[:self._N]
         return (
             self.get_weights(sel=sel), self.get_amplitudes(sel=sel), self.get_params(sel=sel)
         )
@@ -136,19 +134,19 @@ class Chain:
     def get_weights(self, sel=None):
         if sel is None:
             assert self._N > 0, 'Cannot get samples from empty chain'
-            sel = np.s_[-1 % self._N] # get most recent *written* element
+            sel = np.s_[:self._N]
         return self._weights[sel]
 
     def get_amplitudes(self, sel=None):
         if sel is None:
             assert self._N > 0, 'Cannot get samples from empty chain'
-            sel = np.s_[-1 % self._N] # get most recent *written* element
+            sel = np.s_[:self._N]
         return self._amplitudes[sel]
 
     def get_params(self, sel=None):
         if sel is None:
             assert self._N > 0, 'Cannot get samples from empty chain'
-            sel = np.s_[-1 % self._N] # get most recent *written* element
+            sel = np.s_[:self._N]
         d = self.get_empty_params_sample()
         for comp, param in self.paramsiter():
             d[comp][param] = self._params[comp][param][sel]

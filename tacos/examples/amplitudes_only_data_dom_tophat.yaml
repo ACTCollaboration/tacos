@@ -1,4 +1,4 @@
-parameters:
+global:
     pol: QU 
     healpix: False
     geometry_from: '/projects/ACT/zatkins/data/ACTCollaboration/tacos/raw/act/map_pa4_f150_night_set0.fits'
@@ -86,7 +86,7 @@ channels:
 
 components:
     dust:
-        model: Dust
+        sed: Dust
         params:
             beta:
                 value: pysm_Dust_beta
@@ -94,7 +94,7 @@ components:
                 value: pysm_Dust_T
     synch:
         nu0: 23e9
-        model: Synch
+        sed: Synch
         params:
             beta:
                 value: pysm_Synch_beta       

@@ -14,6 +14,13 @@ import pkgutil
 from ast import literal_eval
 import os
 
+def register(registry):
+    """Add a concrete SED implementation to the specified registry (dictionary)."""
+    def decorator(cls):
+        registry[cls.__name__] = cls
+        return cls
+    return decorator
+
 ### tacos ###
 
 def get_cpu_count():
@@ -368,6 +375,7 @@ class GlobalConfigBlock:
         self._dtype = global_block.get('dtype')
         self._num_steps = global_block.get('num_steps')
         self._max_N = global_block.get('max_N')
+        self._linsampler = global_block.get('linsampler')
 
     @property
     def polstr(self):
@@ -396,6 +404,10 @@ class GlobalConfigBlock:
     @property
     def max_N(self):
         return self._max_N
+
+    @property
+    def linsampler(self):
+        return self._linsampler
 
 def eplot(x, *args, fname=None, show=False, **kwargs):
     """Return a list of enplot plots. Optionally, save and display them.

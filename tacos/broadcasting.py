@@ -7,6 +7,9 @@ from tacos import utils
 from pixell import enmap
 import healpy as hp 
 
+REGISTERED_FUNCS = {}
+
+@utils.register(REGISTERED_FUNCS)
 def P_to_QU(arr, axis=0, healpix=False):
     if healpix:
         arr = utils.atleast_nd(arr, 2, axis=axis)
@@ -20,6 +23,7 @@ def P_to_QU(arr, axis=0, healpix=False):
     else:
         raise ValueError(f'Axis {axis} length must be 1 or 2; is {arr.shape[axis]}')
 
+@utils.register(REGISTERED_FUNCS)
 def simple_upgrade(arr, factor=1, healpix=False):
     if healpix:
         nside_in = hp.npix2nside(arr.shape[-1])
@@ -31,6 +35,7 @@ def simple_upgrade(arr, factor=1, healpix=False):
         arr = enmap.upgrade(arr, factor)
     return np.asarray(arr)
 
+@utils.register(REGISTERED_FUNCS)
 def simple_downgrade(arr, factor=1, op=np.mean, healpix=False):
     if healpix:
         nside_in = hp.npix2nside(arr.shape[-1])

@@ -2,6 +2,7 @@ import numpy as np
 from scipy import interpolate as interp
 
 from pixell import enmap
+from enlib import bench
 
 from tacos import utils, config
 
@@ -13,7 +14,7 @@ method_order_key = {
     'cubic': 3
 } 
 
-class Element:
+class _Element:
 
     def __init__(self, channel, component):
         
@@ -86,12 +87,13 @@ class Element:
 
 class MixingMatrix:
     
-    def __init__(self, channels, components, shape, wcs=None, dtype=None):
+    def __init__(self, channels, components, shape, wcs=None, dtype=None, **comp_params):
 
         # shape is map shape, ie (npol, ny, nx) or (npol, npix) or (npol, nalm)
 
         self._channels = channels
         self._components = components
+        self._comp_names  = [comp.name for comp in components]
         num_chan = len(channels)
         num_comp = len(components)
 
@@ -105,29 +107,37 @@ class MixingMatrix:
         for comp in components:
             self._elements[comp.name] = []
             for chan in channels:
-                self._elements[comp.name].append(Element(chan, comp))
+                self._elements[comp.name].append(_Element(chan, comp)) # does all interpolation!
         
         self._shape = (num_chan, num_comp) + shape
-        self._matrix = np.zeros(self._shape, dtype=dtype)
+        self._matrix = np.empty(self._shape, dtype=dtype)
+        if self._wcs is not None:
+            self._matrix = enmap.ndmap(self._matrix, self._wcs)
+        
+        # when initialized, need to give it something so it can build the first time
+        self._init_call(**comp_params)
 
-    def __call__(self, chain=None, sel=None, **comp_params):
-        if chain is not None:
-            assert chain.dtype == self._dtype, \
-                f'Chain dtype {chain.dtype} does not match Mixing Matrix dtype {self._dtype}'
-            assert chain.shape == self._matrix.shape[2:], \
-                f'Params object shape {chain.shape} must equal matrix shape {self.matrix.shape[2:]}'
-            assert len(comp_params) == 0, \
-                'If Chain instance is passed, cannot also pass implicit component parameters'
-            comp_params = chain.get_params(sel=sel)
-
-        # update Elements by component
+    def _init_call(self, **comp_params):
+        # update Elements by component. do this for every element
+        # the first time, so that we initialize every element
         for compidx, comp_name in enumerate(self._elements):
-            active_params = comp_params.get(comp_name, {})
+            comp_active_params = comp_params.get(comp_name, {})
             for chanidx, element in enumerate(self._elements[comp_name]):
                 # this line is where all the broadcasting must come together!
-                self._matrix[chanidx, compidx] = element(**active_params) 
+                self._matrix[chanidx, compidx] = element(**comp_active_params) 
 
-        return self.matrix
+    def __call__(self, **comp_params):
+        # update Elements by component. only want to update elements with
+        # comp params that have been passed, so that successive calls
+        # are as fast as possible
+        for comp_name in comp_params:
+            compidx = self._comp_names.index(comp_name)
+            comp_active_params = comp_params[comp_name]
+            for chanidx, element in enumerate(self._elements[comp_name]):
+                # this line is where all the broadcasting must come together!
+                self._matrix[chanidx, compidx] = element(**comp_active_params) 
+
+        return self._matrix
 
     @classmethod
     def load_from_config(cls, config_path, verbose=True):
@@ -156,11 +166,12 @@ class MixingMatrix:
         return self._shape
 
     @property
+    def dtype(self):
+        return self._dtype
+
+    @property
     def matrix(self):
-        if self._wcs is None:
-            return self._matrix
-        else:
-            return enmap.ndmap(self._matrix, self._wcs)
+        return self._matrix
 
 def get_exact_mixing_matrix(channels, components, shape, wcs=None, dtype=np.float32):
     '''
@@ -193,7 +204,7 @@ def get_exact_mixing_matrix(channels, components, shape, wcs=None, dtype=np.floa
             res = u_conv * chan.bandpass.integrate_signal(comp)
             m[chanidx, compidx] = res
 
-    if wcs:
+    if wcs is not None:
         m = enmap.ndmap(m, wcs)
 
     return m

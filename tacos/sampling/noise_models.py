@@ -3,6 +3,8 @@ from mnms import noise_models
 
 from tacos import utils
 
+from abc import ABC, abstractmethod
+
 # this is a wrapper module to help expose available noise models to tacos, both
 # those that are defined in mnms and defined within tacos, without dealing
 # with messy Python namespace stuff
@@ -16,34 +18,11 @@ REGISTERED_NOISE_MODELS = noise_models.REGISTERED_NOISE_MODELS
 template_path = utils.data_dir_str('template')
 
 
-@noise_models.register(registry=REGISTERED_NOISE_MODELS)
-class SimplePixelNoiseModel:
+class TacosNoiseModel(ABC):
 
-    # TODO: handle more than polarization correlations? ie, channel correlations
-
+    @abstractmethod
     def __init__(self, inv_cov_mat, shape=None, dtype=None, polstr=None, cov_mult_fact=None):
         dtype = dtype if dtype else np.float32
-
-        # cast inv_cov_mat to array of correct dtype and shape
-        inv_cov_mat = np.asarray(inv_cov_mat, dtype=dtype)
-        if shape is not None:
-            inv_cov_mat = self._massage_input(inv_cov_mat, shape[-2:])
-        
-        # slice out pol dimensions
-        self._polidxs = utils.polstr2polidxs(polstr)
-        inv_cov_mat = inv_cov_mat[np.ix_(self._polidxs, self._polidxs)]
-        assert inv_cov_mat.ndim == 4, \
-            'Inverse covariance for a single dataset/prior must have shape (npol, npol, ny, nx)'    
-        
-        # scale covariance by mult_fact if provided
-        if cov_mult_fact is None:
-            cov_mult_fact = 1.
-        inv_cov_mat /= cov_mult_fact # cov_mult_fact applies to covariance!
-        
-        self._nm_dict = {'inv_cov_mat': inv_cov_mat} # to be consistent with mnms
-        self._shape = self.model.shape
-        self._dtype = dtype if dtype else np.float32
-        self._cov_mult_fact = cov_mult_fact
 
     def _massage_input(self, arr, shape):
         """Put input array into correct shape, which is (3, 3, ny, nx). If
@@ -92,6 +71,68 @@ class SimplePixelNoiseModel:
             # must broadcast in first dimension if arr.ndim == 3!
             return np.eye(3, dtype=arr.dtype)[..., None, None] * arr
 
+    @abstractmethod
+    def filter(self, imap, power=-1):
+        assert imap.shape == self._shape[1:], \
+            f'Covariance matrix has shape {self._shape}, so imap must have shape {self._shape[1:]}'
+
+    @property
+    def model(self):
+        return self._nm_dict['inv_cov_mat']
+
+
+@utils.register(REGISTERED_NOISE_MODELS)
+class ZeroInformationNoiseModel(TacosNoiseModel):
+
+    def __init__(self, shape, dtype=None, polstr=None):
+        inv_cov_mat = np.zeros(1, dtype=dtype)
+        inv_cov_mat = self._massage_input(inv_cov_mat, shape[-2:])
+        
+        # slice out pol dimensions
+        self._polidxs = utils.polstr2polidxs(polstr)
+        inv_cov_mat = inv_cov_mat[np.ix_(self._polidxs, self._polidxs)]
+        assert inv_cov_mat.ndim == 4, \
+            'Inverse covariance for a single dataset/prior must have shape (npol, npol, ny, nx)'    
+            
+        self._nm_dict = {'inv_cov_mat': inv_cov_mat} # to be consistent with mnms
+        self._shape = self.model.shape
+
+    def filter(self, imap, power=-1):
+        super().filter(imap, power=-1)
+        assert power < 0, \
+            f'Covariance is infinite, can only filter vector by negative power, got {power}'
+        return 0 * imap
+
+
+@utils.register(REGISTERED_NOISE_MODELS)
+class SimplePixelNoiseModel(TacosNoiseModel):
+
+    # TODO: handle more than polarization correlations? ie, channel correlations
+
+    def __init__(self, inv_cov_mat, shape=None, dtype=None, polstr=None, cov_mult_fact=None):
+        super().__init__(inv_cov_mat, shape=shape, dtype=dtype, polstr=polstr, cov_mult_fact=cov_mult_fact)
+
+        # cast inv_cov_mat to array of correct dtype and shape
+        inv_cov_mat = np.asarray(inv_cov_mat, dtype=dtype)
+        if shape is not None:
+            inv_cov_mat = self._massage_input(inv_cov_mat, shape[-2:])
+        
+        # slice out pol dimensions
+        self._polidxs = utils.polstr2polidxs(polstr)
+        inv_cov_mat = inv_cov_mat[np.ix_(self._polidxs, self._polidxs)]
+        assert inv_cov_mat.ndim == 4, \
+            'Inverse covariance for a single dataset/prior must have shape (npol, npol, ny, nx)'    
+        
+        # scale covariance by mult_fact if provided
+        if cov_mult_fact is None:
+            cov_mult_fact = 1.
+        inv_cov_mat /= cov_mult_fact # cov_mult_fact applies to covariance!
+        
+        self._nm_dict = {'inv_cov_mat': inv_cov_mat} # to be consistent with mnms
+        self._shape = self.model.shape
+        self._dtype = dtype if dtype else np.float32
+        self._cov_mult_fact = cov_mult_fact
+
     def get_sim(self, split_num, sim_num, *str2seed_args):
         seed = (split_num, sim_num)
         for arg in str2seed_args:
@@ -103,8 +144,7 @@ class SimplePixelNoiseModel:
         return self.filter(eta, power=0.5)
 
     def filter(self, imap, power=-1):
-        assert imap.shape == self._shape[1:], \
-            f'Covariance matrix has shape {self._shape}, so imap must have shape {self._shape[1:]}'
+        super().filter(imap, power=-1)
         if power == -1:
             model = self.model
         else:
@@ -116,26 +156,3 @@ class SimplePixelNoiseModel:
                 model = utils.eigpow(self.model, -power, axes=[-4, -3])
                 self._nm_dict[power] = model
         return np.einsum('ab...,b...->a...', model, imap)
-
-    @classmethod
-    def load_from_value(cls, value, healpix, dtype=None, verbose=True):
-        dtype = dtype if dtype else np.float32
-
-        scalar_verbose_str = f'Fixing {cls.__name__} to {float(value)}'
-        fullpath_verbose_str = f'Fixing {cls.__name__} to data at {value}'
-        resource_verbose_str = f'Fixing {cls.__name__} to {value} template'
-        return utils.parse_maplike_value(
-            value, healpix, template_path, dtype=dtype, scalar_verbose_str=scalar_verbose_str,
-            fullpath_verbose_str=fullpath_verbose_str, resource_verbose_str=resource_verbose_str,
-            verbose=verbose
-            )
-            
-    @property
-    def model(self):
-        return self._nm_dict['inv_cov_mat']
-
-    @model.setter
-    def model(self, value):
-        # anything that can broadcast is OK, so do icov[:]= instead of icov=
-        self._nm_dict['inv_cov_mat'][:] = value
-

@@ -15,23 +15,6 @@ class Config:
         config_base, _ = os.path.splitext(config_path)
         self._name = os.path.basename(config_base)
 
-        # get list of channels
-        self._channels = []
-        if load_channels:
-            for instr, bands in config_dict['channels'].items():
-                for band, channel_kwargs in bands.items():
-                    if (channel_kwargs is None) or (channel_kwargs == 'None'):
-                        channel_kwargs = {}
-                    self._channels.append(data.Channel(instr, band, **channel_kwargs))
-                
-        # get list of components and possible their priors
-        self._components = []
-        if load_components:
-            for comp_name in config_dict['components']:
-                self._components.append(
-                    component.Component.load_from_config(config_path, comp_name, verbose=verbose)
-                    )  
-
         # get pol, shape, wcs, dtype, ...
         global_config_block = utils.GlobalConfigBlock(config_path, verbose=verbose)
 
@@ -41,7 +24,27 @@ class Config:
         self._wcs = global_config_block.wcs 
         self._dtype = global_config_block.dtype 
         self._num_steps = global_config_block.num_steps
-        self._max_N = global_config_block.max_N        
+        self._max_N = global_config_block.max_N
+        self._linsampler = global_config_block.linsampler   
+
+        # get list of channels
+        self._channels = []
+        if load_channels:
+            for instr, bands in config_dict['channels'].items():
+                for band, channel_kwargs in bands.items():
+                    if (channel_kwargs is None) or (channel_kwargs == 'None'):
+                        channel_kwargs = {}
+                    self._channels.append(data.Channel(
+                        instr, band, polstr=self._polstr, healpix=self._healpix, **channel_kwargs
+                        ))
+                
+        # get list of components and possible their priors
+        self._components = []
+        if load_components:
+            for comp_name in config_dict['components']:
+                self._components.append(
+                    component.Component.load_from_config(config_path, comp_name, verbose=verbose)
+                    )  
 
     @property
     def name(self):
@@ -82,3 +85,7 @@ class Config:
     @property
     def max_N(self):
         return self._max_N
+
+    @property
+    def linsampler(self):
+        return self._linsampler
