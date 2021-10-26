@@ -1,0 +1,18 @@
+inversion_sampler:
+    method: 'linear'
+    dust:
+        beta: 
+            low: 1.05
+            high: 2.05
+            coarse_N: 11
+            fine_N: 51
+
+        T:
+            low: 5
+            high: 45
+            N: 101
+    Synch:
+        beta:
+            low: -6.0
+            high: 0.0
+            N: 101

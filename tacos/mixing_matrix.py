@@ -140,14 +140,14 @@ class MixingMatrix:
         return self._matrix
 
     @classmethod
-    def load_from_config(cls, config_path, verbose=True):
+    def load_from_config(cls, config_path, verbose=True, **init_params):
         config_obj = config.Config(config_path, verbose=verbose)
         channels = config_obj.channels
         components = config_obj.components
         shape = config_obj.shape
         wcs = config_obj.wcs
         dtype = config_obj.dtype
-        return cls(channels, components, shape, wcs=wcs, dtype=dtype)
+        return cls(channels, components, shape, wcs=wcs, dtype=dtype, **init_params)
 
     @property
     def channels(self):

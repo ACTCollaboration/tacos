@@ -8,12 +8,12 @@ class GibbsSampler:
     # Holds metadata about the sampling run, as well as the necessary objects: a Chain, 
     # MixingMatrix, LinSampler, and NonLinSampler (possibly)
 
-    def __init__(self, chain, mixing_matrix, linsampler=None, nonlinsampler=None,
+    def __init__(self, chain, mixing_matrix, linsampler=None, nonlinsamplers=None,
                 init_amplitudes=None, init_params=None, num_steps=None, dtype=None):
         self._chain = chain
         self._mixing_matrix = mixing_matrix
         self._linsampler = linsampler
-        self._nonlinsampler = nonlinsampler
+        self._nonlinsamplers = nonlinsamplers
         
         self._num_steps = num_steps if num_steps else 1000
         self._dtype = dtype if dtype else np.float32
@@ -26,28 +26,31 @@ class GibbsSampler:
         self._num_comp = num_comp
         self._num_pol = num_pol
 
+        # TODO: implement shape, keywords checks
+
         self._prev_amplitudes_sample = init_amplitudes
         self._prev_params_sample = init_params
 
     def step(self):
         
-        # somehow we need a starting point, if beta, and whether or not priors.
-        # do we always start with a beta sample, if available? I think so
-        params_sample = self._chain.get_empty_params_sample()
-        if self._nonlinsampler is not None:
+        # stepping through the nonlinear subspace of gibbs chain, so need to condition
+        # subsequent nonlinear params on the *new* proposed params, *not* the previous
+        # gibbs step
+        if self._nonlinsamplers is not None:
             for comp, param in self._chain.paramsiter():
-                params_sample[comp][param] = self._nonlinsampler(self._prev_amplitudes_sample)
+                nonlinsampler = self._nonlinsamplers[comp][param]
+                self._prev_params_sample = nonlinsampler(
+                    self._prev_amplitudes_sample, self._prev_params_sample, seed=None
+                    )
 
-        # get the mixing matrix for this call. this is fast because
+        # get the mixing matrix for this call. this is faster because
         # only updated params are actually evaluated
-        M = self._mixing_matrix(**params_sample)
+        M = self._mixing_matrix(**self._prev_params_sample)
+        self._prev_amplitudes_sample = self._linsampler(M, noise_seed=None, prior_seed=None)
 
-        amplitudes_sample = self._linsampler(M)
-
-        self._chain.add_samples(weights=[1,1], amplitudes=amplitudes_sample, params=params_sample)
-
-        self._prev_amplitudes_sample = amplitudes_sample
-        self._prev_params_sample = params_sample
+        self._chain.add_samples(
+            weights=[1,1], amplitudes=self._prev_amplitudes_sample, params=self._prev_params_sample
+            )
 
     def run(self, step_per_save=None):
         if step_per_save is None:
@@ -75,9 +78,13 @@ class GibbsSampler:
 
     @classmethod
     def load_from_config(cls, config_path, verbose=True):
+        # to avoid repeats, only get verbose messages from mixing matrix, since
+        # chain and config_obj methods have at least one of load_channels, load_components
+        # set to False
         chain = _chain.Chain.load_from_config(config_path, verbose=False)
         mixing_matrix = _mixing_matrix.MixingMatrix.load_from_config(config_path, verbose=verbose)
         config_obj = _config.Config(config_path, load_channels=False, load_components=False, verbose=False)
+
         channels = mixing_matrix.channels
         components = mixing_matrix.components
         num_steps = config_obj.num_steps

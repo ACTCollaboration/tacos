@@ -3,7 +3,7 @@ global:
     healpix: False
     geometry_from: '/projects/ACT/zatkins/data/ACTCollaboration/tacos/raw/act/map_pa4_f150_night_set0.fits'
     dtype: 'f4'
-    num_steps: 100
+    num_steps: 50
     linsampler: SingleBasis
 
 channels:
@@ -11,75 +11,75 @@ channels:
         K:
             pysm: True
             noise: 0
-            pysm_notes: tophat
+            pysm_notes: d0
             bandpass_kwargs:
                 tophat: True
         Ka:
             pysm: True
             noise: 20
-            pysm_notes: tophat
+            pysm_notes: d0
             bandpass_kwargs:
                 tophat: True
         Q:
             pysm: True
             noise: 11
-            pysm_notes: tophat
+            pysm_notes: d0
             bandpass_kwargs:
                 tophat: True
         V:
             pysm: True
             noise: 21
-            pysm_notes: tophat
+            pysm_notes: d0
             bandpass_kwargs:
                 tophat: True
         W:
             pysm: True
             noise: 22
-            pysm_notes: tophat
+            pysm_notes: d0
             bandpass_kwargs:
                 tophat: True
     act:
         f090:
             pysm: True
             noise: 1
-            pysm_notes: tophat
+            pysm_notes: d0
             bandpass_kwargs:
                 tophat: True
         f150:
             pysm: True
             noise: 2
-            pysm_notes: tophat
+            pysm_notes: d0
             bandpass_kwargs:
                 tophat: True
         f220:
             pysm: True
             noise: 3
-            pysm_notes: tophat
+            pysm_notes: d0
             bandpass_kwargs:
                 tophat: True
     planck:
         '100':
             pysm: True
             noise: 30
-            pysm_notes: tophat
+            pysm_notes: d0
             bandpass_kwargs:
                 tophat: True
         '143':
             pysm: True
             noise: 31
-            pysm_notes: tophat
+            pysm_notes: d0
             bandpass_kwargs:
                 tophat: True
         '217':
             pysm: True
             noise: 99
-            pysm_notes: tophat
+            pysm_notes: d0
             bandpass_kwargs:
                 tophat: True
         '353':
             pysm: True
             noise: 4
-            pysm_notes: tophat
+            pysm_notes: d0
             bandpass_kwargs:
                 tophat: True
 
@@ -88,24 +88,24 @@ components:
         sed: Dust
         params:
             beta:
-                value: pysm_Dust_beta
+                shape: (1,)
             T:
-                value: pysm_Dust_T
-        prior: 
-            noise_model: SimplePixelNoiseModel
-            values:
-                noise_model: 1. 
-                mean: 69. 
-            cov_mult_fact: 1.
+                value: 20.0
+        # prior: 
+        #     noise_model: SimplePixelNoiseModel
+        #     values:
+        #         noise_model: 1. 
+        #         mean: 62.
+        #     cov_mult_fact: 1.
     synch:
         sed: Synch
         nu0: 23e9
         params:
             beta:
                 value: pysm_Synch_beta  
-        prior:
-            noise_model: SimplePixelNoiseModel
-            values:
-                noise_model: 1. 
-                mean: 420. 
-            cov_mult_fact: 1.   
+        # prior:
+        #     noise_model: SimplePixelNoiseModel
+        #     values:
+        #         noise_model: 1. 
+        #         mean: 150. 
+        #     cov_mult_fact: 1.   

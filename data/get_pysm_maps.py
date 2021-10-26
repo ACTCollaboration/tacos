@@ -54,7 +54,7 @@ for instr in instr_band:
 
         # load the pysm bandpass
         bandpass_path = utils.data_dir_str('bandpass', instr)
-        bandpass_path += utils.data_fn_str(type='bandpass', instr=instr, band='all', id='all', set='all')
+        bandpass_path += utils.data_fn_str(product='bandpass', instr=instr, band='all', id='all', set='all')
         
         # pysm applies nu**2 to convert to Jy/sr from RJ (inside get_emission,
         # inside normalize_weights), so we will need to make sure to do 
@@ -81,8 +81,8 @@ for instr in instr_band:
         notes = args.notes
         notes = 'tophat' if args.tophat and not notes else notes
         hnotes = 'healpix' if not notes else f'healpix_{notes}'
-        hmap_fn = utils.data_fn_str(type='map', instr='pysm', band=band, id='all', set='all', notes=hnotes)
+        hmap_fn = utils.data_fn_str(product='map', instr='pysm', band=band, id='all', set='all', notes=hnotes)
         hp.write_map(mappath + hmap_fn, hmap.astype(args.odtype), extra_header=extra, overwrite=True)
 
-        imap_fn = utils.data_fn_str(type='map', instr='pysm', band=band, id='all', set='all', notes=notes)
+        imap_fn = utils.data_fn_str(product='map', instr='pysm', band=band, id='all', set='all', notes=notes)
         enmap.write_map(mappath + imap_fn, imap.astype(args.odtype), extra=extra)

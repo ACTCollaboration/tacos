@@ -2,16 +2,16 @@ interpolation:
     method: 'cubic'
     Dust:
         beta: 
-            low: -3.5
-            high: 6.5
-            N: 1_000
+            low: -0.5
+            high: 3.5
+            N: 1_001
 
         T:
             low: 5
             high: 45
-            N: 1_000
+            N: 1_001
     Synch:
         beta:
-            low: -8
-            high: 2
-            N: 10_000
+            low: -6.0
+            high: 0.0
+            N: 1_001
